@@ -125,8 +125,10 @@ def backfill_historical_prices(
     request_delay: float = 1.1,
 ) -> dict[str, Any]:
     session = get_session()
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
+    end_date = date.today() - timedelta(days=1)
+    if days <= 0:
+        return {"inserted": 0, "requested": 0, "ranges": []}
+    start_date = end_date - timedelta(days=days - 1)
 
     crypto = session.execute(
         select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
