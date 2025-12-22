@@ -32,5 +32,5 @@ def compute_indicators(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result["bb_lower"] = result["sma_20"] - (result["std_20"] * 2)
 
     result["date"] = result["date"].dt.strftime("%Y-%m-%d")
-    result = result.where(pd.notnull(result), None)
+    result = result.astype(object).where(pd.notnull(result), None)
     return result.to_dict(orient="records")
