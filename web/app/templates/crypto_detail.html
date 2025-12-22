@@ -1,9 +1,37 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h1 class="h3 mb-3">{{ crypto.name or crypto.coingecko_id }}</h1>
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <h1 class="h3 mb-0">{{ crypto.name or crypto.coingecko_id }}</h1>
+    <form method="get" class="d-flex align-items-center gap-2">
+      <label for="days" class="form-label mb-0">Range</label>
+      <select class="form-select" id="days" name="days">
+        <option value="0" {% if days == 0 %}selected{% endif %}>All</option>
+        <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
+        <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
+        <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
+        <option value="180" {% if days == 180 %}selected{% endif %}>180 days</option>
+        {% if max_days not in [0,7,30,90,180] %}
+          <option value="{{ max_days }}" {% if days == max_days %}selected{% endif %}>
+            {{ max_days }} days
+          </option>
+        {% endif %}
+      </select>
+      <button type="submit" class="btn btn-outline-primary">Apply</button>
+    </form>
+  </div>
 
   {% if series %}
+    <div class="d-flex flex-wrap gap-3 mb-3">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="SMA 7" id="toggle-sma-7" checked>
+        <label class="form-check-label" for="toggle-sma-7">SMA 7</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="SMA 30" id="toggle-sma-30" checked>
+        <label class="form-check-label" for="toggle-sma-30">SMA 30</label>
+      </div>
+    </div>
     <div class="card">
       <div class="card-body">
         <div id="price-chart" class="chart-container" data-series='{{ series|tojson }}' data-currency="{{ currency }}"></div>

@@ -52,5 +52,23 @@ if (chartEl) {
     };
 
     Plotly.newPlot("price-chart", data, layout, { responsive: true });
+
+    const sma7Toggle = document.getElementById("toggle-sma-7");
+    const sma30Toggle = document.getElementById("toggle-sma-30");
+
+    const setVisibility = (traceIndex, visible) => {
+      Plotly.restyle("price-chart", { visible: visible ? true : "legendonly" }, [traceIndex]);
+    };
+
+    if (sma7Toggle) {
+      sma7Toggle.addEventListener("change", (event) => {
+        setVisibility(1, event.target.checked);
+      });
+    }
+    if (sma30Toggle) {
+      sma30Toggle.addEventListener("change", (event) => {
+        setVisibility(2, event.target.checked);
+      });
+    }
   }
 }

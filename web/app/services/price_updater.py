@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -10,6 +10,41 @@ from sqlalchemy import select
 from ..db import get_session
 from ..models import Cryptocurrency, Price
 from .coingecko import CoinGeckoClient, CoinGeckoError
+
+
+def load_historical_prices(
+    client: CoinGeckoClient,
+    crypto: Cryptocurrency,
+    vs_currency: str,
+    days: int,
+) -> int:
+    session = get_session()
+    payload = client.get_market_chart(crypto.coingecko_id, vs_currency, days)
+    prices = payload.get("prices", [])
+    if not prices:
+        return 0
+
+    by_date: dict[date, Decimal] = {}
+    for timestamp_ms, price in prices:
+        dt = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).date()
+        by_date[dt] = Decimal(str(price))
+
+    records = [
+        {"crypto_id": crypto.id, "date": day, "price": price}
+        for day, price in by_date.items()
+    ]
+    stmt = insert(Price).values(records)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[Price.crypto_id, Price.date],
+        set_={"price": stmt.excluded.price},
+    )
+    try:
+        session.execute(stmt)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return len(records)
 
 
 def update_daily_prices(
