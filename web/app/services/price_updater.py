@@ -64,12 +64,9 @@ def update_crypto_price(
 ) -> bool:
     if _price_exists(session, crypto.id, as_of):
         return False
-    payload = client.get_current_price(crypto.coingecko_id, vs_currency=vs_currency)
-    price_value = payload.get(crypto.coingecko_id, {}).get(vs_currency)
-    if price_value is None:
-        raise CoinGeckoError("Price not found in response")
-
-    price_decimal = Decimal(str(price_value))
+    price_decimal = _fetch_historical_price(
+        client, crypto.coingecko_id, vs_currency, as_of
+    )
     _upsert_price(session, crypto.id, as_of, price_decimal)
     session.commit()
     return True
@@ -79,7 +76,10 @@ def update_single_price(
     crypto_id: int, client: CoinGeckoClient, vs_currency: str, as_of: date | None = None
 ) -> bool:
     session = get_session()
-    as_of = as_of or date.today()
+    today = date.today()
+    as_of = as_of or today
+    if as_of >= today:
+        as_of = today - timedelta(days=1)
     crypto = session.execute(
         select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
     ).scalar_one_or_none()
@@ -98,6 +98,21 @@ def _to_timestamp(day: date, end_of_day: bool) -> int:
     else:
         dt = datetime.combine(day, time(0, 0, 0), tzinfo=timezone.utc)
     return int(dt.timestamp())
+
+
+def _fetch_historical_price(
+    client: CoinGeckoClient, coingecko_id: str, vs_currency: str, as_of: date
+) -> Decimal:
+    from_ts = _to_timestamp(as_of, end_of_day=False)
+    to_ts = _to_timestamp(as_of, end_of_day=True)
+    payload = client.get_market_chart_range(coingecko_id, vs_currency, from_ts, to_ts)
+    prices = payload.get("prices", [])
+    if not prices:
+        raise CoinGeckoError("Historical price not found in response")
+    timestamp_ms, price_value = max(prices, key=lambda item: item[0])
+    if price_value is None:
+        raise CoinGeckoError("Historical price not found in response")
+    return Decimal(str(price_value))
 
 
 def _compute_missing_ranges(
@@ -203,7 +218,10 @@ def update_daily_prices(
     client: CoinGeckoClient, vs_currency: str, as_of: date | None = None
 ) -> dict[str, Any]:
     session = get_session()
-    as_of = as_of or date.today()
+    today = date.today()
+    as_of = as_of or today
+    if as_of >= today:
+        as_of = today - timedelta(days=1)
 
     cryptos = session.execute(select(Cryptocurrency)).scalars().all()
     if not cryptos:

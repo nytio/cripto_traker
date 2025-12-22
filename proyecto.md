@@ -29,6 +29,8 @@ Construir una plataforma web (dashboard) que permita:
 11. Aplicar seguridad mínima: validación/sanitización, CSRF, cabeceras, secretos por env, consultas parametrizadas/ORM, contenedores sin root.
 12. Añadir documentación y bases de calidad: `README.md` operativo, pinning de dependencias, y tests básicos (cliente API mockeado + analytics).
 
+Es una política general que la cotización sea solo de ayer, para evitar consultas innecesarias. La base de datos solo guarda datos de ayer para mantener consistencia histórica. El precio de hoy no se utiliza.
+
 ---
 
 ## 2) Arquitectura en Docker (servicios, red y persistencia)
