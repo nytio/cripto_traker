@@ -9,6 +9,10 @@ bp = Blueprint("prices", __name__, url_prefix="/prices")
 @bp.post("/update")
 def update_prices():
     client = CoinGeckoClient(current_app.config["COINGECKO_BASE_URL"])
-    result = update_daily_prices(client)
-    flash(f"Prices updated: {result['updated']}", "success")
+    vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
+    result = update_daily_prices(client, vs_currency=vs_currency)
+    if result["updated"]:
+        flash(f"Prices updated: {result['updated']}", "success")
+    if result["errors"]:
+        flash(f"Errors updating prices: {len(result['errors'])}", "error")
     return redirect(url_for("dashboard.index"))

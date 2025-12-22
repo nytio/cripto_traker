@@ -4,13 +4,53 @@
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h3">Dashboard</h1>
     <form method="post" action="{{ url_for('prices.update_prices') }}">
+      {{ csrf_token() }}
       <button type="submit" class="btn btn-primary">Update prices</button>
     </form>
   </div>
 
-  <div class="card">
-    <div class="card-body">
-      <p class="text-muted mb-0">No data yet. Add a crypto to start tracking.</p>
+  {% if rows %}
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Symbol</th>
+              <th>Latest price ({{ currency }})</th>
+              <th>Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>{{ row.crypto.name or row.crypto.coingecko_id }}</td>
+                <td class="text-uppercase">{{ row.crypto.symbol or '-' }}</td>
+                <td>
+                  {% if row.latest %}
+                    {{ "%.4f"|format(row.latest.price) }}
+                  {% else %}
+                    --
+                  {% endif %}
+                </td>
+                <td>{{ row.latest.date if row.latest else '--' }}</td>
+                <td>
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('charts.crypto_detail', crypto_id=row.crypto.id) }}">
+                    View
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  {% else %}
+    <div class="card">
+      <div class="card-body">
+        <p class="text-muted mb-0">No data yet. Add a crypto to start tracking.</p>
+      </div>
+    </div>
+  {% endif %}
 {% endblock %}

@@ -26,3 +26,4 @@
 
 - La base de datos no expone puertos al host; solo esta disponible dentro de la red de Compose.
 - Este repo inicia con un esqueleto de Flask y estructura de servicios y rutas.
+- Configura `COINGECKO_VS_CURRENCY` si quieres usar otra moneda de referencia (default: usd).
