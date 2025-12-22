@@ -24,7 +24,9 @@ def create_app() -> Flask:
             "Content-Security-Policy",
             "default-src 'self'; "
             "script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; "
-            "style-src 'self' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src-attr 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
             "connect-src 'self'",

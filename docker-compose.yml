@@ -24,5 +24,24 @@ services:
     ports:
       - "8000:8000"
 
+  scheduler:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
+      COINGECKO_BASE_URL: ${COINGECKO_BASE_URL}
+      COINGECKO_VS_CURRENCY: ${COINGECKO_VS_CURRENCY}
+      MAX_HISTORY_DAYS: ${MAX_HISTORY_DAYS}
+      LOG_LEVEL: ${LOG_LEVEL}
+      SCHEDULER_TIMEZONE: ${SCHEDULER_TIMEZONE}
+      SCHEDULE_HOUR: ${SCHEDULE_HOUR}
+      SCHEDULE_MINUTE: ${SCHEDULE_MINUTE}
+      SCHEDULE_RUN_ON_START: ${SCHEDULE_RUN_ON_START}
+    command: ["python", "-m", "app.scripts.scheduler"]
+    profiles: ["scheduler"]
+
 volumes:
   pgdata:

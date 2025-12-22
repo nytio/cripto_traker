@@ -36,6 +36,20 @@
 - `GET /api/cryptos/<id>/prices`
 - `GET /api/cryptos/<id>/series?days=30&indicators=1`
 
+## Scheduler opcional
+
+Para ejecutar la actualizacion diaria en un contenedor separado:
+
+```bash
+docker compose --profile scheduler up --build
+```
+
+Variables:
+- `SCHEDULER_TIMEZONE` (default: UTC)
+- `SCHEDULE_HOUR` (0-23)
+- `SCHEDULE_MINUTE` (0-59)
+- `SCHEDULE_RUN_ON_START` (1 para ejecutar al iniciar)
+
 ## Tests
 
 ```bash
