@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1 class="h3 mb-3">Add crypto</h1>
+  <form method="post" action="{{ url_for('cryptos.create_crypto') }}">
+    <div class="mb-3">
+      <label for="coingecko_id" class="form-label">CoinGecko ID</label>
+      <input type="text" class="form-control" id="coingecko_id" name="coingecko_id" placeholder="bitcoin">
+      <div class="form-text">Use the CoinGecko ID (e.g., bitcoin, ethereum).</div>
+    </div>
+    <button type="submit" class="btn btn-success">Save</button>
+    <a class="btn btn-secondary" href="{{ url_for('dashboard.index') }}">Cancel</a>
+  </form>
+{% endblock %}
