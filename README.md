@@ -28,3 +28,10 @@
 - Este repo inicia con un esqueleto de Flask y estructura de servicios y rutas.
 - Configura `COINGECKO_VS_CURRENCY` si quieres usar otra moneda de referencia (default: usd).
 - Puedes limitar la carga historica con `MAX_HISTORY_DAYS` (default: 365).
+
+## API basica
+
+- `GET /api/health`
+- `GET /api/cryptos`
+- `GET /api/cryptos/<id>/prices`
+- `GET /api/cryptos/<id>/series?days=30&indicators=1`
