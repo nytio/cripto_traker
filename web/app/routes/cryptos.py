@@ -41,7 +41,11 @@ def create_crypto():
         flash("Crypto already exists", "error")
         return redirect(url_for("cryptos.new_crypto"))
 
-    client = CoinGeckoClient(current_app.config["COINGECKO_BASE_URL"])
+    client = CoinGeckoClient(
+        current_app.config["COINGECKO_BASE_URL"],
+        retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
+        retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
+    )
     try:
         coin = client.get_coin_basic(coingecko_id)
     except CoinGeckoError as exc:

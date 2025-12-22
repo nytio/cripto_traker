@@ -21,6 +21,8 @@ services:
       COINGECKO_VS_CURRENCY: ${COINGECKO_VS_CURRENCY}
       MAX_HISTORY_DAYS: ${MAX_HISTORY_DAYS}
       COINGECKO_REQUEST_DELAY: ${COINGECKO_REQUEST_DELAY}
+      COINGECKO_RETRY_COUNT: ${COINGECKO_RETRY_COUNT}
+      COINGECKO_RETRY_DELAY: ${COINGECKO_RETRY_DELAY}
       LOG_LEVEL: ${LOG_LEVEL}
     ports:
       - "8000:8000"
@@ -37,6 +39,8 @@ services:
       COINGECKO_VS_CURRENCY: ${COINGECKO_VS_CURRENCY}
       MAX_HISTORY_DAYS: ${MAX_HISTORY_DAYS}
       COINGECKO_REQUEST_DELAY: ${COINGECKO_REQUEST_DELAY}
+      COINGECKO_RETRY_COUNT: ${COINGECKO_RETRY_COUNT}
+      COINGECKO_RETRY_DELAY: ${COINGECKO_RETRY_DELAY}
       LOG_LEVEL: ${LOG_LEVEL}
       SCHEDULER_TIMEZONE: ${SCHEDULER_TIMEZONE}
       SCHEDULE_HOUR: ${SCHEDULE_HOUR}
@@ -45,6 +49,19 @@ services:
       SCHEDULE_OFFSET_DAYS: ${SCHEDULE_OFFSET_DAYS}
     command: ["python", "-m", "app.scripts.scheduler"]
     profiles: ["scheduler"]
+
+  nginx:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    profiles: ["nginx"]
 
 volumes:
   pgdata:

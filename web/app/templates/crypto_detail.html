@@ -27,10 +27,10 @@
   </div>
 
   <div class="collapse mb-3" id="backfill-form">
-    <form method="post" action="{{ url_for('prices.backfill_prices', crypto_id=crypto.id) }}" class="d-flex flex-wrap align-items-center gap-2">
+    <form method="post" action="{{ url_for('prices.backfill_prices', crypto_id=crypto.id) }}" class="d-flex flex-wrap align-items-center gap-2" data-loading="1">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="number" class="form-control" name="history_days" min="1" max="{{ max_days }}" placeholder="Backfill days">
-      <button type="submit" class="btn btn-outline-secondary">Run backfill</button>
+      <button type="submit" class="btn btn-outline-secondary" data-loading-text="Backfilling...">Run backfill</button>
     </form>
   </div>
 
@@ -45,6 +45,10 @@
       <div class="form-check">
         <input class="form-check-input" type="checkbox" value="SMA 30" id="toggle-sma-30" checked>
         <label class="form-check-label" for="toggle-sma-30">SMA 30</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="Bollinger" id="toggle-bollinger">
+        <label class="form-check-label" for="toggle-bollinger">Bollinger</label>
       </div>
     </div>
     <div class="card">

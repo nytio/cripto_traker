@@ -29,6 +29,7 @@
 - Configura `COINGECKO_VS_CURRENCY` si quieres usar otra moneda de referencia (default: usd).
 - Puedes limitar la carga historica con `MAX_HISTORY_DAYS` (default: 365).
 - Usa `COINGECKO_REQUEST_DELAY` para espaciar requests al API (default: 1.1s).
+- Reintentos configurables: `COINGECKO_RETRY_COUNT` y `COINGECKO_RETRY_DELAY`.
 
 ## API basica
 
@@ -45,6 +46,10 @@ En la vista de detalle puedes solicitar un backfill de X dias. El sistema calcul
 
 Los botones de actualizacion manual usan el dia anterior para evitar variaciones intradia.
 
+## Auth (placeholder)
+
+Se incluyen rutas `/login` y `/logout` y un modelo `users` como base para futura autenticacion.
+
 ## Scheduler opcional
 
 Para ejecutar la actualizacion diaria en un contenedor separado:
@@ -59,6 +64,14 @@ Variables:
 - `SCHEDULE_MINUTE` (0-59)
 - `SCHEDULE_RUN_ON_START` (1 para ejecutar al iniciar)
 - `SCHEDULE_OFFSET_DAYS` (default: 1, para actualizar el dia anterior)
+
+## Nginx (opcional, HTTPS)
+
+Agrega certificados en `nginx/certs/fullchain.pem` y `nginx/certs/privkey.pem`, luego levanta:
+
+```bash
+docker compose --profile nginx up --build
+```
 
 ## Tests
 

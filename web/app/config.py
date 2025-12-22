@@ -17,6 +17,15 @@ class Config:
             self.COINGECKO_REQUEST_DELAY = float(delay_raw)
         except ValueError:
             self.COINGECKO_REQUEST_DELAY = 1.1
+        retry_count_raw = os.environ.get("COINGECKO_RETRY_COUNT", "2").strip()
+        self.COINGECKO_RETRY_COUNT = (
+            int(retry_count_raw) if retry_count_raw.isdigit() else 2
+        )
+        retry_delay_raw = os.environ.get("COINGECKO_RETRY_DELAY", "1.0").strip()
+        try:
+            self.COINGECKO_RETRY_DELAY = float(retry_delay_raw)
+        except ValueError:
+            self.COINGECKO_RETRY_DELAY = 1.0
         self.LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
         self.WTF_CSRF_TIME_LIMIT = 3600
         self.SESSION_COOKIE_HTTPONLY = True

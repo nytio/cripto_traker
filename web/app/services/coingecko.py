@@ -1,3 +1,5 @@
+import time
+
 import requests
 
 
@@ -8,8 +10,10 @@ class CoinGeckoError(Exception):
 
 
 class CoinGeckoClient:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, retry_count: int = 2, retry_delay: float = 1.0) -> None:
         self.base_url = base_url.rstrip("/")
+        self.retry_count = max(retry_count, 0)
+        self.retry_delay = max(retry_delay, 0.0)
         self.headers = {
             "Accept": "application/json",
             "User-Agent": "crypto-tracker/1.0",
@@ -17,19 +21,37 @@ class CoinGeckoClient:
 
     def _get(self, path: str, params: dict | None = None) -> dict:
         url = f"{self.base_url}/{path.lstrip('/')}"
-        try:
-            response = requests.get(url, params=params, timeout=10, headers=self.headers)
-        except requests.RequestException as exc:
-            raise CoinGeckoError("Network error calling CoinGecko") from exc
+        last_exc: Exception | None = None
+        for attempt in range(self.retry_count + 1):
+            try:
+                response = requests.get(
+                    url, params=params, timeout=10, headers=self.headers
+                )
+            except requests.RequestException as exc:
+                last_exc = exc
+                if attempt < self.retry_count:
+                    time.sleep(self.retry_delay * (attempt + 1))
+                    continue
+                raise CoinGeckoError("Network error calling CoinGecko") from exc
 
-        if response.status_code == 404:
-            raise CoinGeckoError("CoinGecko resource not found", status_code=404)
-        if not response.ok:
-            raise CoinGeckoError(
-                f"CoinGecko API error ({response.status_code})",
-                status_code=response.status_code,
-            )
-        return response.json()
+            if response.status_code == 404:
+                raise CoinGeckoError("CoinGecko resource not found", status_code=404)
+            if response.status_code in {429} or response.status_code >= 500:
+                if attempt < self.retry_count:
+                    time.sleep(self.retry_delay * (attempt + 1))
+                    continue
+                raise CoinGeckoError(
+                    f"CoinGecko API error ({response.status_code})",
+                    status_code=response.status_code,
+                )
+            if not response.ok:
+                raise CoinGeckoError(
+                    f"CoinGecko API error ({response.status_code})",
+                    status_code=response.status_code,
+                )
+            return response.json()
+
+        raise CoinGeckoError("CoinGecko API error") from last_exc
 
     def ping(self) -> dict:
         return self._get("ping")

@@ -11,7 +11,11 @@ from app.services.price_updater import update_daily_prices
 
 def run_update(app, as_of_date) -> None:
     with app.app_context():
-        client = CoinGeckoClient(app.config["COINGECKO_BASE_URL"])
+        client = CoinGeckoClient(
+            app.config["COINGECKO_BASE_URL"],
+            retry_count=app.config["COINGECKO_RETRY_COUNT"],
+            retry_delay=app.config["COINGECKO_RETRY_DELAY"],
+        )
         vs_currency = app.config["COINGECKO_VS_CURRENCY"]
         result = update_daily_prices(client, vs_currency=vs_currency, as_of=as_of_date)
         updated = result.get("updated", 0)

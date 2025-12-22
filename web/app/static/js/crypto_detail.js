@@ -8,6 +8,8 @@ if (chartEl) {
     const prices = series.map((row) => row.price);
     const sma7 = series.map((row) => row.sma_7);
     const sma30 = series.map((row) => row.sma_30);
+    const bbUpper = series.map((row) => row.bb_upper);
+    const bbLower = series.map((row) => row.bb_lower);
 
     const data = [
       {
@@ -30,6 +32,22 @@ if (chartEl) {
         type: "scatter",
         mode: "lines",
         name: "SMA 30",
+      },
+      {
+        x: dates,
+        y: bbUpper,
+        type: "scatter",
+        mode: "lines",
+        name: "BB Upper",
+        visible: "legendonly",
+      },
+      {
+        x: dates,
+        y: bbLower,
+        type: "scatter",
+        mode: "lines",
+        name: "BB Lower",
+        visible: "legendonly",
       },
     ];
 
@@ -55,19 +73,29 @@ if (chartEl) {
 
     const sma7Toggle = document.getElementById("toggle-sma-7");
     const sma30Toggle = document.getElementById("toggle-sma-30");
+    const bollingerToggle = document.getElementById("toggle-bollinger");
 
-    const setVisibility = (traceIndex, visible) => {
-      Plotly.restyle("price-chart", { visible: visible ? true : "legendonly" }, [traceIndex]);
+    const setVisibility = (traceIndices, visible) => {
+      Plotly.restyle(
+        "price-chart",
+        { visible: visible ? true : "legendonly" },
+        traceIndices
+      );
     };
 
     if (sma7Toggle) {
       sma7Toggle.addEventListener("change", (event) => {
-        setVisibility(1, event.target.checked);
+        setVisibility([1], event.target.checked);
       });
     }
     if (sma30Toggle) {
       sma30Toggle.addEventListener("change", (event) => {
-        setVisibility(2, event.target.checked);
+        setVisibility([2], event.target.checked);
+      });
+    }
+    if (bollingerToggle) {
+      bollingerToggle.addEventListener("change", (event) => {
+        setVisibility([3, 4], event.target.checked);
       });
     }
   }

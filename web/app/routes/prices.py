@@ -14,7 +14,11 @@ bp = Blueprint("prices", __name__, url_prefix="/prices")
 
 @bp.post("/update")
 def update_prices():
-    client = CoinGeckoClient(current_app.config["COINGECKO_BASE_URL"])
+    client = CoinGeckoClient(
+        current_app.config["COINGECKO_BASE_URL"],
+        retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
+        retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
+    )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
     as_of = date.today() - timedelta(days=1)
     result = update_daily_prices(client, vs_currency=vs_currency, as_of=as_of)
@@ -29,7 +33,11 @@ def update_prices():
 
 @bp.post("/update/<int:crypto_id>")
 def update_price(crypto_id: int):
-    client = CoinGeckoClient(current_app.config["COINGECKO_BASE_URL"])
+    client = CoinGeckoClient(
+        current_app.config["COINGECKO_BASE_URL"],
+        retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
+        retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
+    )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
     as_of = date.today() - timedelta(days=1)
     try:
@@ -58,7 +66,11 @@ def backfill_prices(crypto_id: int):
         days = max_days
         flash(f"History days limited to {max_days}", "warning")
 
-    client = CoinGeckoClient(current_app.config["COINGECKO_BASE_URL"])
+    client = CoinGeckoClient(
+        current_app.config["COINGECKO_BASE_URL"],
+        retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
+        retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
+    )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
     request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
 

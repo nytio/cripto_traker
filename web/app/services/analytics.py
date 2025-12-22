@@ -19,12 +19,17 @@ def compute_indicators(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             date,
             price,
             avg(price) over (order by date rows between 6 preceding and current row) as sma_7,
-            avg(price) over (order by date rows between 29 preceding and current row) as sma_30
+            avg(price) over (order by date rows between 29 preceding and current row) as sma_30,
+            avg(price) over (order by date rows between 19 preceding and current row) as sma_20,
+            stddev_samp(price) over (order by date rows between 19 preceding and current row) as std_20
         from prices
         order by date
         """
     ).df()
     con.close()
+
+    result["bb_upper"] = result["sma_20"] + (result["std_20"] * 2)
+    result["bb_lower"] = result["sma_20"] - (result["std_20"] * 2)
 
     result["date"] = result["date"].dt.strftime("%Y-%m-%d")
     return result.to_dict(orient="records")

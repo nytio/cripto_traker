@@ -3,7 +3,7 @@ from flask_wtf.csrf import CSRFProtect
 
 from .config import Config
 from .db import init_db
-from .routes import api, charts, cryptos, dashboard, prices
+from .routes import api, auth, charts, cryptos, dashboard, prices
 
 csrf = CSRFProtect()
 
@@ -38,5 +38,6 @@ def create_app() -> Flask:
     app.register_blueprint(prices.bp)
     app.register_blueprint(charts.bp)
     app.register_blueprint(api.bp)
+    app.register_blueprint(auth.bp)
 
     return app
