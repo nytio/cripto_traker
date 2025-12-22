@@ -17,7 +17,10 @@ def run_update(app, as_of_date) -> None:
             retry_delay=app.config["COINGECKO_RETRY_DELAY"],
         )
         vs_currency = app.config["COINGECKO_VS_CURRENCY"]
-        result = update_daily_prices(client, vs_currency=vs_currency, as_of=as_of_date)
+        request_delay = app.config["COINGECKO_REQUEST_DELAY"]
+        result = update_daily_prices(
+            client, vs_currency=vs_currency, as_of=as_of_date, request_delay=request_delay
+        )
         updated = result.get("updated", 0)
         errors = result.get("errors", [])
         timestamp = datetime.utcnow().isoformat()

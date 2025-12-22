@@ -215,7 +215,10 @@ def backfill_historical_prices(
 
 
 def update_daily_prices(
-    client: CoinGeckoClient, vs_currency: str, as_of: date | None = None
+    client: CoinGeckoClient,
+    vs_currency: str,
+    as_of: date | None = None,
+    request_delay: float = 0.0,
 ) -> dict[str, Any]:
     session = get_session()
     today = date.today()
@@ -230,7 +233,11 @@ def update_daily_prices(
     skipped = 0
     errors: list[dict[str, str]] = []
 
-    for crypto in cryptos:
+    for idx, crypto in enumerate(cryptos):
+        should_request = not _price_exists(session, crypto.id, as_of)
+        if not should_request:
+            skipped += 1
+            continue
         try:
             did_update = update_crypto_price(session, client, crypto, vs_currency, as_of)
             if did_update:
@@ -240,5 +247,8 @@ def update_daily_prices(
         except Exception as exc:
             session.rollback()
             errors.append({"crypto_id": str(crypto.id), "error": str(exc)})
+        finally:
+            if should_request and request_delay > 0 and idx < len(cryptos) - 1:
+                time_module.sleep(request_delay)
 
     return {"updated": updated, "skipped": skipped, "errors": errors}

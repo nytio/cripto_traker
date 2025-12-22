@@ -20,8 +20,11 @@ def update_prices():
         retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
     )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
+    request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
     as_of = date.today() - timedelta(days=1)
-    result = update_daily_prices(client, vs_currency=vs_currency, as_of=as_of)
+    result = update_daily_prices(
+        client, vs_currency=vs_currency, as_of=as_of, request_delay=request_delay
+    )
     if result["updated"]:
         flash(f"Prices updated for {as_of}: {result['updated']}", "success")
     if result["skipped"]:
