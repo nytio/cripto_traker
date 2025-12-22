@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -9,15 +9,18 @@ from app.services.coingecko import CoinGeckoClient
 from app.services.price_updater import update_daily_prices
 
 
-def run_update(app) -> None:
+def run_update(app, as_of_date) -> None:
     with app.app_context():
         client = CoinGeckoClient(app.config["COINGECKO_BASE_URL"])
         vs_currency = app.config["COINGECKO_VS_CURRENCY"]
-        result = update_daily_prices(client, vs_currency=vs_currency)
+        result = update_daily_prices(client, vs_currency=vs_currency, as_of=as_of_date)
         updated = result.get("updated", 0)
         errors = result.get("errors", [])
         timestamp = datetime.utcnow().isoformat()
-        print(f"[{timestamp}] Updated {updated} cryptos; errors: {len(errors)}", flush=True)
+        print(
+            f"[{timestamp}] Updated {updated} cryptos for {as_of_date}; errors: {len(errors)}",
+            flush=True,
+        )
 
 
 def main() -> None:
@@ -26,13 +29,18 @@ def main() -> None:
     hour_raw = os.environ.get("SCHEDULE_HOUR", "0")
     minute_raw = os.environ.get("SCHEDULE_MINUTE", "0")
     run_on_start = os.environ.get("SCHEDULE_RUN_ON_START", "0")
+    offset_raw = os.environ.get("SCHEDULE_OFFSET_DAYS", "1")
 
     hour = int(hour_raw) if hour_raw.isdigit() else 0
     minute = int(minute_raw) if minute_raw.isdigit() else 0
+    offset_days = int(offset_raw) if offset_raw.isdigit() else 1
+    if offset_days < 0:
+        offset_days = 0
 
-    scheduler = BlockingScheduler(timezone=ZoneInfo(tz_name))
+    tz = ZoneInfo(tz_name)
+    scheduler = BlockingScheduler(timezone=tz)
     scheduler.add_job(
-        lambda: run_update(app),
+        lambda: run_update(app, (datetime.now(tz).date() - timedelta(days=offset_days))),
         "cron",
         hour=hour,
         minute=minute,
@@ -41,10 +49,11 @@ def main() -> None:
     )
 
     if run_on_start == "1":
-        run_update(app)
+        run_update(app, (datetime.now(tz).date() - timedelta(days=offset_days)))
 
     print(
-        f"Scheduler started (daily at {hour:02d}:{minute:02d} {tz_name})",
+        f"Scheduler started (daily at {hour:02d}:{minute:02d} {tz_name}, "
+        f"offset {offset_days} day(s))",
         flush=True,
     )
     scheduler.start()

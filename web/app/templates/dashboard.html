@@ -5,7 +5,7 @@
     <h1 class="h3">Dashboard</h1>
     <form method="post" action="{{ url_for('prices.update_prices') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn-primary">Update prices</button>
+      <button type="submit" class="btn btn-primary">Update</button>
     </form>
   </div>
 

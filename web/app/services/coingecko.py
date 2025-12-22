@@ -68,3 +68,15 @@ class CoinGeckoClient:
             f"coins/{coingecko_id}/market_chart",
             params={"vs_currency": vs_currency, "days": days},
         )
+
+    def get_market_chart_range(
+        self, coingecko_id: str, vs_currency: str, from_ts: int, to_ts: int
+    ) -> dict:
+        return self._get(
+            f"coins/{coingecko_id}/market_chart/range",
+            params={
+                "vs_currency": vs_currency,
+                "from": from_ts,
+                "to": to_ts,
+            },
+        )

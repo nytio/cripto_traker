@@ -3,23 +3,38 @@
 {% block content %}
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
     <h1 class="h3 mb-0">{{ crypto.name or crypto.coingecko_id }}</h1>
-    <form method="get" class="d-flex align-items-center gap-2">
-      <label for="days" class="form-label mb-0">Range</label>
-      <select class="form-select" id="days" name="days">
-        <option value="0" {% if days == 0 %}selected{% endif %}>All</option>
-        <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
-        <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
-        <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
-        <option value="180" {% if days == 180 %}selected{% endif %}>180 days</option>
-        {% if max_days not in [0,7,30,90,180] %}
-          <option value="{{ max_days }}" {% if days == max_days %}selected{% endif %}>
-            {{ max_days }} days
-          </option>
-        {% endif %}
-      </select>
-      <button type="submit" class="btn btn-outline-primary">Apply</button>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <form method="get" class="d-flex align-items-center gap-2">
+        <label for="days" class="form-label mb-0">Range</label>
+        <select class="form-select" id="days" name="days">
+          <option value="0" {% if days == 0 %}selected{% endif %}>All</option>
+          <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
+          <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
+          <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
+          <option value="180" {% if days == 180 %}selected{% endif %}>180 days</option>
+          {% if max_days not in [0,7,30,90,180] %}
+            <option value="{{ max_days }}" {% if days == max_days %}selected{% endif %}>
+              {{ max_days }} days
+            </option>
+          {% endif %}
+        </select>
+        <button type="submit" class="btn btn-outline-primary">Apply</button>
+      </form>
+      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#backfill-form" aria-expanded="false" aria-controls="backfill-form">
+        Backfill
+      </button>
+    </div>
+  </div>
+
+  <div class="collapse mb-3" id="backfill-form">
+    <form method="post" action="{{ url_for('prices.backfill_prices', crypto_id=crypto.id) }}" class="d-flex flex-wrap align-items-center gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="number" class="form-control" name="history_days" min="1" max="{{ max_days }}" placeholder="Backfill days">
+      <button type="submit" class="btn btn-outline-secondary">Run backfill</button>
     </form>
   </div>
+
+  <p class="text-muted">Backfill only requests missing days and respects API limits.</p>
 
   {% if series %}
     <div class="d-flex flex-wrap gap-3 mb-3">

@@ -12,6 +12,11 @@ class Config:
         self.COINGECKO_VS_CURRENCY = (vs_currency or "usd").lower()
         max_days_raw = os.environ.get("MAX_HISTORY_DAYS", "")
         self.MAX_HISTORY_DAYS = int(max_days_raw) if max_days_raw.isdigit() else 365
+        delay_raw = os.environ.get("COINGECKO_REQUEST_DELAY", "1.1").strip()
+        try:
+            self.COINGECKO_REQUEST_DELAY = float(delay_raw)
+        except ValueError:
+            self.COINGECKO_REQUEST_DELAY = 1.1
         self.LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
         self.WTF_CSRF_TIME_LIMIT = 3600
         self.SESSION_COOKIE_HTTPONLY = True
