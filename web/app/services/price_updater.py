@@ -47,6 +47,51 @@ def load_historical_prices(
     return len(records)
 
 
+def _upsert_price(
+    session, crypto_id: int, as_of: date, price_decimal: Decimal
+) -> None:
+    stmt = insert(Price).values(
+        crypto_id=crypto_id,
+        date=as_of,
+        price=price_decimal,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[Price.crypto_id, Price.date],
+        set_={"price": price_decimal},
+    )
+    session.execute(stmt)
+
+
+def update_crypto_price(
+    session, client: CoinGeckoClient, crypto: Cryptocurrency, vs_currency: str, as_of: date
+) -> None:
+    payload = client.get_current_price(crypto.coingecko_id, vs_currency=vs_currency)
+    price_value = payload.get(crypto.coingecko_id, {}).get(vs_currency)
+    if price_value is None:
+        raise CoinGeckoError("Price not found in response")
+
+    price_decimal = Decimal(str(price_value))
+    _upsert_price(session, crypto.id, as_of, price_decimal)
+    session.commit()
+
+
+def update_single_price(
+    crypto_id: int, client: CoinGeckoClient, vs_currency: str, as_of: date | None = None
+) -> None:
+    session = get_session()
+    as_of = as_of or date.today()
+    crypto = session.execute(
+        select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
+    ).scalar_one_or_none()
+    if not crypto:
+        raise ValueError("Crypto not found")
+    try:
+        update_crypto_price(session, client, crypto, vs_currency, as_of)
+    except Exception:
+        session.rollback()
+        raise
+
+
 def update_daily_prices(
     client: CoinGeckoClient, vs_currency: str, as_of: date | None = None
 ) -> dict[str, Any]:
@@ -61,23 +106,7 @@ def update_daily_prices(
 
     for crypto in cryptos:
         try:
-            payload = client.get_current_price(crypto.coingecko_id, vs_currency=vs_currency)
-            price_value = payload.get(crypto.coingecko_id, {}).get(vs_currency)
-            if price_value is None:
-                raise CoinGeckoError("Price not found in response")
-
-            price_decimal = Decimal(str(price_value))
-            stmt = insert(Price).values(
-                crypto_id=crypto.id,
-                date=as_of,
-                price=price_decimal,
-            )
-            stmt = stmt.on_conflict_do_update(
-                index_elements=[Price.crypto_id, Price.date],
-                set_={"price": price_decimal},
-            )
-            session.execute(stmt)
-            session.commit()
+            update_crypto_price(session, client, crypto, vs_currency, as_of)
             updated += 1
         except Exception as exc:
             session.rollback()

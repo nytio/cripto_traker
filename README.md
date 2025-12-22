@@ -35,3 +35,10 @@
 - `GET /api/cryptos`
 - `GET /api/cryptos/<id>/prices`
 - `GET /api/cryptos/<id>/series?days=30&indicators=1`
+
+## Tests
+
+```bash
+pip install -r web/requirements.txt -r requirements-dev.txt
+PYTHONPATH=web pytest
+```
