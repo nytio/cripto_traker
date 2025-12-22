@@ -18,34 +18,18 @@ def load_historical_prices(
     crypto: Cryptocurrency,
     vs_currency: str,
     days: int,
+    request_delay: float = 1.1,
 ) -> int:
-    session = get_session()
-    payload = client.get_market_chart(crypto.coingecko_id, vs_currency, days)
-    prices = payload.get("prices", [])
-    if not prices:
+    if days <= 0:
         return 0
-
-    by_date: dict[date, Decimal] = {}
-    for timestamp_ms, price in prices:
-        dt = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).date()
-        by_date[dt] = Decimal(str(price))
-
-    records = [
-        {"crypto_id": crypto.id, "date": day, "price": price}
-        for day, price in by_date.items()
-    ]
-    stmt = insert(Price).values(records)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=[Price.crypto_id, Price.date],
-        set_={"price": stmt.excluded.price},
+    result = backfill_historical_prices(
+        crypto.id,
+        client,
+        vs_currency=vs_currency,
+        days=days,
+        request_delay=request_delay,
     )
-    try:
-        session.execute(stmt)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    return len(records)
+    return result["inserted"]
 
 
 def _upsert_price(

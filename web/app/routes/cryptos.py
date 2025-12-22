@@ -73,7 +73,10 @@ def create_crypto():
     if history_days > 0:
         try:
             vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
-            inserted = load_historical_prices(client, crypto, vs_currency, history_days)
+            request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
+            inserted = load_historical_prices(
+                client, crypto, vs_currency, history_days, request_delay=request_delay
+            )
             flash(f"Loaded {inserted} historical prices", "success")
         except Exception as exc:
             flash(f"Failed to load history: {exc}", "error")
