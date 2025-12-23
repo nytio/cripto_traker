@@ -11,14 +11,97 @@ if (chartEl) {
     const bbUpper = series.map((row) => row.bb_upper);
     const bbLower = series.map((row) => row.bb_lower);
 
-    const data = [
-      {
+    const baselinePrice = prices.find((value) => Number.isFinite(value));
+    const priceTraces = [];
+    const greenColor = "#198754";
+    const redColor = "#dc3545";
+
+    if (!Number.isFinite(baselinePrice)) {
+      priceTraces.push({
         x: dates,
         y: prices,
         type: "scatter",
         mode: "lines",
         name: "Price",
-      },
+        line: { color: greenColor },
+      });
+    } else {
+      let currentColor = null;
+      let segmentX = [];
+      let segmentY = [];
+      let lastDate = null;
+      let lastPrice = null;
+      let hasLegend = false;
+
+      const flushSegment = () => {
+        if (segmentX.length > 1 && currentColor) {
+          priceTraces.push({
+            x: segmentX,
+            y: segmentY,
+            type: "scatter",
+            mode: "lines",
+            name: "Price",
+            showlegend: !hasLegend,
+            line: { color: currentColor },
+          });
+          hasLegend = true;
+        }
+      };
+
+      for (let i = 0; i < prices.length; i += 1) {
+        const price = prices[i];
+        const date = dates[i];
+
+        if (!Number.isFinite(price)) {
+          flushSegment();
+          segmentX = [];
+          segmentY = [];
+          currentColor = null;
+          lastDate = null;
+          lastPrice = null;
+          continue;
+        }
+
+        if (lastDate === null) {
+          segmentX = [date];
+          segmentY = [price];
+          lastDate = date;
+          lastPrice = price;
+          continue;
+        }
+
+        const segmentColor = price >= baselinePrice ? greenColor : redColor;
+        if (currentColor === null) {
+          currentColor = segmentColor;
+        } else if (segmentColor !== currentColor) {
+          flushSegment();
+          segmentX = [lastDate];
+          segmentY = [lastPrice];
+          currentColor = segmentColor;
+        }
+
+        segmentX.push(date);
+        segmentY.push(price);
+        lastDate = date;
+        lastPrice = price;
+      }
+
+      flushSegment();
+
+      if (!priceTraces.length) {
+        priceTraces.push({
+          x: dates,
+          y: prices,
+          type: "scatter",
+          mode: "lines",
+          name: "Price",
+          line: { color: greenColor },
+        });
+      }
+    }
+
+    const data = [
+      ...priceTraces,
       {
         x: dates,
         y: sma7,
@@ -26,6 +109,7 @@ if (chartEl) {
         mode: "lines",
         name: "SMA 7",
         visible: "legendonly",
+        line: { dash: "dash" },
       },
       {
         x: dates,
@@ -34,6 +118,7 @@ if (chartEl) {
         mode: "lines",
         name: "SMA 30",
         visible: "legendonly",
+        line: { dash: "dash" },
       },
       {
         x: dates,
@@ -57,7 +142,7 @@ if (chartEl) {
       margin: { t: 20, r: 20, l: 50, b: 40 },
       xaxis: {
         type: "date",
-        rangeslider: { visible: true },
+        rangeslider: { visible: false },
         rangeselector: {
           buttons: [
             { count: 7, label: "7d", step: "day", stepmode: "backward" },
@@ -76,6 +161,7 @@ if (chartEl) {
     const sma7Toggle = document.getElementById("toggle-sma-7");
     const sma30Toggle = document.getElementById("toggle-sma-30");
     const bollingerToggle = document.getElementById("toggle-bollinger");
+    const indicatorOffset = priceTraces.length;
 
     const setVisibility = (traceIndices, visible) => {
       Plotly.restyle(
@@ -87,17 +173,17 @@ if (chartEl) {
 
     if (sma7Toggle) {
       sma7Toggle.addEventListener("change", (event) => {
-        setVisibility([1], event.target.checked);
+        setVisibility([indicatorOffset], event.target.checked);
       });
     }
     if (sma30Toggle) {
       sma30Toggle.addEventListener("change", (event) => {
-        setVisibility([2], event.target.checked);
+        setVisibility([indicatorOffset + 1], event.target.checked);
       });
     }
     if (bollingerToggle) {
       bollingerToggle.addEventListener("change", (event) => {
-        setVisibility([3, 4], event.target.checked);
+        setVisibility([indicatorOffset + 2, indicatorOffset + 3], event.target.checked);
       });
     }
   }
