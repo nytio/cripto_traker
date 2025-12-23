@@ -8,11 +8,11 @@
         <label for="days" class="form-label mb-0">Range</label>
         <select class="form-select" id="days" name="days">
           <option value="0" {% if days == 0 %}selected{% endif %}>All</option>
-          <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
-          <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
-          <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
-          <option value="180" {% if days == 180 %}selected{% endif %}>180 days</option>
-          {% if max_days not in [0,7,30,90,180] %}
+          <option value="1825" {% if days == 1825 %}selected{% endif %}>5 years</option>
+          <option value="365" {% if days == 365 %}selected{% endif %}>1 year</option>
+          <option value="180" {% if days == 180 %}selected{% endif %}>6 month</option>
+          <option value="90" {% if days == 90 %}selected{% endif %}>3 month</option>
+          {% if max_days not in [0,1825,365,90,180] %}
             <option value="{{ max_days }}" {% if days == max_days %}selected{% endif %}>
               {{ max_days }} days
             </option>
@@ -34,16 +34,15 @@
     </form>
   </div>
 
-  <p class="text-muted">Backfill only requests missing days and respects API limits.</p>
 
   {% if series %}
     <div class="d-flex flex-wrap gap-3 mb-3">
       <div class="form-check">
-        <input class="form-check-input" type="checkbox" value="SMA 7" id="toggle-sma-7" checked>
+        <input class="form-check-input" type="checkbox" value="SMA 7" id="toggle-sma-7">
         <label class="form-check-label" for="toggle-sma-7">SMA 7</label>
       </div>
       <div class="form-check">
-        <input class="form-check-input" type="checkbox" value="SMA 30" id="toggle-sma-30" checked>
+        <input class="form-check-input" type="checkbox" value="SMA 30" id="toggle-sma-30">
         <label class="form-check-label" for="toggle-sma-30">SMA 30</label>
       </div>
       <div class="form-check">

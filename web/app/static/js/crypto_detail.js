@@ -25,6 +25,7 @@ if (chartEl) {
         type: "scatter",
         mode: "lines",
         name: "SMA 7",
+        visible: "legendonly",
       },
       {
         x: dates,
@@ -32,6 +33,7 @@ if (chartEl) {
         type: "scatter",
         mode: "lines",
         name: "SMA 30",
+        visible: "legendonly",
       },
       {
         x: dates,
