@@ -14,9 +14,20 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-ENV CMDSTAN=/opt/cmdstan
+ENV CMDSTAN=/opt/cmdstan/latest
 ENV MPLCONFIGDIR=/tmp/matplotlib
-RUN python -m cmdstanpy.install_cmdstan --dir=${CMDSTAN}
+RUN python - <<'PY'
+from cmdstanpy import install_cmdstan, cmdstan_path
+import os
+
+install_cmdstan(dir="/opt/cmdstan")
+path = cmdstan_path()
+link = "/opt/cmdstan/latest"
+if os.path.islink(link) or os.path.exists(link):
+    os.unlink(link)
+os.symlink(path, link)
+PY
+RUN chmod -R a+rX /opt/cmdstan
 
 COPY . .
 

@@ -1,4 +1,6 @@
+import importlib.resources as importlib_resources
 import logging
+import os
 from functools import lru_cache
 from typing import Any
 
@@ -50,20 +52,59 @@ def compute_indicators(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result.to_dict(orient="records")
 
 
-@lru_cache(maxsize=1)
-def _prophet_ready() -> bool:
-    if Prophet is None:
-        logger.warning("Prophet no esta disponible; omitiendo pronostico.")
-        return False
+def _configure_cmdstan() -> bool:
     if cmdstan_path is None:
         logger.warning("CmdStanPy no esta disponible; omitiendo pronostico.")
         return False
+
+    cmdstan_dir = os.environ.get("CMDSTAN", "").strip()
+    if not cmdstan_dir:
+        fallback_dir = "/opt/cmdstan/latest"
+        if os.path.isdir(fallback_dir):
+            cmdstan_dir = fallback_dir
+
+    if cmdstan_dir:
+        try:
+            from cmdstanpy import set_cmdstan_path
+        except ImportError:
+            logger.warning("CmdStanPy no esta disponible; omitiendo pronostico.")
+            return False
+        try:
+            set_cmdstan_path(cmdstan_dir)
+        except Exception as exc:
+            logger.warning(
+                "CmdStan no disponible en %s (%s); omitiendo pronostico.",
+                cmdstan_dir,
+                exc,
+            )
+            return False
+        try:
+            from prophet import models as prophet_models
+
+            local_cmdstan = (
+                importlib_resources.files("prophet")
+                / "stan_model"
+                / f"cmdstan-{prophet_models.CmdStanPyBackend.CMDSTAN_VERSION}"
+            )
+            if local_cmdstan.exists():
+                prophet_models.CmdStanPyBackend.CMDSTAN_VERSION = "external"
+        except Exception:
+            logger.debug("No se pudo ajustar el backend de Prophet.")
+
     try:
         cmdstan_path()
     except Exception as exc:
         logger.warning("CmdStan no instalado (%s); omitiendo pronostico.", exc)
         return False
     return True
+
+
+@lru_cache(maxsize=1)
+def _prophet_ready() -> bool:
+    if Prophet is None:
+        logger.warning("Prophet no esta disponible; omitiendo pronostico.")
+        return False
+    return _configure_cmdstan()
 
 
 def compute_prophet_forecast(
