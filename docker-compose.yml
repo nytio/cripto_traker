@@ -25,8 +25,7 @@ services:
       COINGECKO_RETRY_DELAY: ${COINGECKO_RETRY_DELAY}
       LOG_LEVEL: ${LOG_LEVEL}
     ports:
-      - "127.0.0.1:8080:8000"
-      #- "[::1]:8080:8000"
+      - "[::1]:8080:8000/tcp"
 
   scheduler:
     build: ./web
