@@ -26,6 +26,10 @@ class Config:
             self.COINGECKO_RETRY_DELAY = float(retry_delay_raw)
         except ValueError:
             self.COINGECKO_RETRY_DELAY = 1.0
+        prophet_days_raw = os.environ.get("PROPHET_FUTURE_DAYS", "30").strip()
+        self.PROPHET_FUTURE_DAYS = (
+            int(prophet_days_raw) if prophet_days_raw.isdigit() else 30
+        )
         self.LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
         self.WTF_CSRF_TIME_LIMIT = 3600
         self.SESSION_COOKIE_HTTPONLY = True

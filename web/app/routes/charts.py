@@ -3,7 +3,11 @@ from sqlalchemy import select
 
 from ..db import get_session
 from ..models import Cryptocurrency
-from ..services.analytics import compute_indicators
+from ..services.analytics import (
+    compute_indicators,
+    compute_prophet_forecast,
+    merge_prophet_forecast,
+)
 from ..services.series import clamp_days, fetch_price_series
 
 bp = Blueprint("charts", __name__)
@@ -23,6 +27,9 @@ def crypto_detail(crypto_id: int):
 
     rows = fetch_price_series(session, crypto_id, days)
     series = compute_indicators(rows)
+    forecast_days = current_app.config.get("PROPHET_FUTURE_DAYS", 30)
+    forecast = compute_prophet_forecast(rows, forecast_days)
+    series = merge_prophet_forecast(series, forecast)
     return render_template(
         "crypto_detail.html",
         crypto=crypto,

@@ -10,6 +10,9 @@ if (chartEl) {
     const sma30 = series.map((row) => row.sma_30);
     const bbUpper = series.map((row) => row.bb_upper);
     const bbLower = series.map((row) => row.bb_lower);
+    const prophetYhat = series.map((row) => row.yhat);
+    const prophetLower = series.map((row) => row.yhat_lower);
+    const prophetUpper = series.map((row) => row.yhat_upper);
 
     const baselinePrice = prices.find((value) => Number.isFinite(value));
     const priceTraces = [];
@@ -18,6 +21,9 @@ if (chartEl) {
     const bollingerBandColor = "rgba(148, 103, 189, 0.15)";
     const bollingerBandLine = "rgba(148, 103, 189, 0.3)";
     const bollingerLineColor = "rgba(148, 103, 189, 0.3)";
+    const prophetBandColor = "rgba(23, 162, 184, 0.15)";
+    const prophetBandLine = "rgba(23, 162, 184, 0.35)";
+    const prophetLineColor = "#17A2B8";
     const priceLineWidth = 2.5;
     const smaLineWidth = 1.2;
     const priceMonoColor = "#1F77B4";
@@ -130,6 +136,30 @@ if (chartEl) {
         line: { color: bollingerBandLine, width: 1 },
       },
     ];
+    const prophetBandTraces = [
+      {
+        x: dates,
+        y: prophetLower,
+        type: "scatter",
+        mode: "lines",
+        name: "Prophet band",
+        showlegend: false,
+        visible: "legendonly",
+        line: { color: prophetBandLine, width: 1 },
+      },
+      {
+        x: dates,
+        y: prophetUpper,
+        type: "scatter",
+        mode: "lines",
+        name: "Prophet band",
+        showlegend: false,
+        visible: "legendonly",
+        fill: "tonexty",
+        fillcolor: prophetBandColor,
+        line: { color: prophetBandLine, width: 1 },
+      },
+    ];
     const priceMonoTrace = {
       x: dates,
       y: prices,
@@ -139,9 +169,20 @@ if (chartEl) {
       visible: "legendonly",
       line: { color: priceMonoColor, width: priceLineWidth },
     };
+    const prophetLineTrace = {
+      x: dates,
+      y: prophetYhat,
+      type: "scatter",
+      mode: "lines",
+      name: "Prophet",
+      visible: "legendonly",
+      line: { color: prophetLineColor, dash: "dot", width: smaLineWidth },
+    };
 
     const data = [
       ...bollingerBandTraces,
+      ...prophetBandTraces,
+      prophetLineTrace,
       ...priceTraces,
       priceMonoTrace,
       {
@@ -204,14 +245,21 @@ if (chartEl) {
     const sma7Toggle = document.getElementById("toggle-sma-7");
     const sma30Toggle = document.getElementById("toggle-sma-30");
     const bollingerToggle = document.getElementById("toggle-bollinger");
+    const prophetToggle = document.getElementById("toggle-prophet");
     const priceModeToggle = document.getElementById("toggle-price-mode");
-    const priceTraceOffset = bollingerBandTraces.length;
+    const prophetBandOffset = bollingerBandTraces.length;
+    const prophetBandIndices = prophetBandTraces.map(
+      (_, index) => prophetBandOffset + index
+    );
+    const prophetLineIndex = prophetBandOffset + prophetBandTraces.length;
+    const priceTraceOffset = prophetLineIndex + 1;
     const priceTraceIndices = priceTraces.map((_, index) => priceTraceOffset + index);
     const priceMonoIndex = priceTraceOffset + priceTraces.length;
     const indicatorOffset = priceMonoIndex + 1;
     const bollingerBandIndices = bollingerBandTraces.map((_, index) => index);
     const bollingerLineIndices = [indicatorOffset + 2, indicatorOffset + 3];
     const bollingerTraceIndices = [...bollingerBandIndices, ...bollingerLineIndices];
+    const prophetTraceIndices = [...prophetBandIndices, prophetLineIndex];
 
     const setVisibility = (traceIndices, visible) => {
       Plotly.restyle(
@@ -234,6 +282,11 @@ if (chartEl) {
     if (bollingerToggle) {
       bollingerToggle.addEventListener("change", (event) => {
         setVisibility(bollingerTraceIndices, event.target.checked);
+      });
+    }
+    if (prophetToggle) {
+      prophetToggle.addEventListener("change", (event) => {
+        setVisibility(prophetTraceIndices, event.target.checked);
       });
     }
     if (priceModeToggle) {
