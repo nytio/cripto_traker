@@ -20,6 +20,7 @@ if (chartEl) {
     const bollingerLineColor = "rgba(148, 103, 189, 0.3)";
     const priceLineWidth = 2.5;
     const smaLineWidth = 1.2;
+    const priceMonoColor = "#1F77B4";
 
     if (!Number.isFinite(baselinePrice)) {
       priceTraces.push({
@@ -129,10 +130,20 @@ if (chartEl) {
         line: { color: bollingerBandLine, width: 1 },
       },
     ];
+    const priceMonoTrace = {
+      x: dates,
+      y: prices,
+      type: "scatter",
+      mode: "lines",
+      name: "Price mono",
+      visible: "legendonly",
+      line: { color: priceMonoColor, width: priceLineWidth },
+    };
 
     const data = [
       ...bollingerBandTraces,
       ...priceTraces,
+      priceMonoTrace,
       {
         x: dates,
         y: sma7,
@@ -193,7 +204,11 @@ if (chartEl) {
     const sma7Toggle = document.getElementById("toggle-sma-7");
     const sma30Toggle = document.getElementById("toggle-sma-30");
     const bollingerToggle = document.getElementById("toggle-bollinger");
-    const indicatorOffset = bollingerBandTraces.length + priceTraces.length;
+    const priceModeToggle = document.getElementById("toggle-price-mode");
+    const priceTraceOffset = bollingerBandTraces.length;
+    const priceTraceIndices = priceTraces.map((_, index) => priceTraceOffset + index);
+    const priceMonoIndex = priceTraceOffset + priceTraces.length;
+    const indicatorOffset = priceMonoIndex + 1;
     const bollingerBandIndices = bollingerBandTraces.map((_, index) => index);
     const bollingerLineIndices = [indicatorOffset + 2, indicatorOffset + 3];
     const bollingerTraceIndices = [...bollingerBandIndices, ...bollingerLineIndices];
@@ -219,6 +234,17 @@ if (chartEl) {
     if (bollingerToggle) {
       bollingerToggle.addEventListener("change", (event) => {
         setVisibility(bollingerTraceIndices, event.target.checked);
+      });
+    }
+    if (priceModeToggle) {
+      priceModeToggle.addEventListener("change", (event) => {
+        const useMono = event.target.checked;
+        setVisibility(priceTraceIndices, !useMono);
+        Plotly.restyle(
+          "price-chart",
+          { visible: useMono ? true : "legendonly" },
+          [priceMonoIndex]
+        );
       });
     }
   }
