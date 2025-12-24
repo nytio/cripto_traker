@@ -1,3 +1,5 @@
+import logging
+from functools import lru_cache
 from typing import Any
 
 import duckdb
@@ -7,6 +9,13 @@ try:
     from prophet import Prophet
 except ImportError:  # pragma: no cover - optional dependency fallback
     Prophet = None
+
+try:
+    from cmdstanpy import cmdstan_path
+except ImportError:  # pragma: no cover - optional dependency fallback
+    cmdstan_path = None
+
+logger = logging.getLogger(__name__)
 
 
 def compute_indicators(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -41,10 +50,26 @@ def compute_indicators(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result.to_dict(orient="records")
 
 
+@lru_cache(maxsize=1)
+def _prophet_ready() -> bool:
+    if Prophet is None:
+        logger.warning("Prophet no esta disponible; omitiendo pronostico.")
+        return False
+    if cmdstan_path is None:
+        logger.warning("CmdStanPy no esta disponible; omitiendo pronostico.")
+        return False
+    try:
+        cmdstan_path()
+    except Exception as exc:
+        logger.warning("CmdStan no instalado (%s); omitiendo pronostico.", exc)
+        return False
+    return True
+
+
 def compute_prophet_forecast(
     rows: list[dict[str, Any]], horizon_days: int
 ) -> list[dict[str, Any]]:
-    if horizon_days <= 0 or len(rows) < 2 or Prophet is None:
+    if horizon_days <= 0 or len(rows) < 2 or not _prophet_ready():
         return []
 
     df = pd.DataFrame(rows)
@@ -63,9 +88,13 @@ def compute_prophet_forecast(
             daily_seasonality=False,
             weekly_seasonality=True,
             yearly_seasonality=True,
+            stan_backend="CMDSTANPY",
         )
         model.fit(df)
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "Fallo el ajuste de Prophet (%s); omitiendo pronostico.", exc
+        )
         return []
 
     future = model.make_future_dataframe(periods=horizon_days, freq="D")
