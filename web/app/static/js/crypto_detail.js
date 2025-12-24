@@ -13,11 +13,13 @@ if (chartEl) {
 
     const baselinePrice = prices.find((value) => Number.isFinite(value));
     const priceTraces = [];
-    const greenColor = "#198754";
-    const redColor = "#dc3545";
-    const bollingerBandColor = "rgba(140, 108, 214, 0.4)";
-    const bollingerBandLine = "rgba(140, 108, 214, 0)";
-    const bollingerLineColor = "rgba(170, 150, 230, 0.75)";
+    const greenColor = "#2CA02C";
+    const redColor = "#D62728";
+    const bollingerBandColor = "rgba(148, 103, 189, 0.15)";
+    const bollingerBandLine = "rgba(148, 103, 189, 0.3)";
+    const bollingerLineColor = "rgba(148, 103, 189, 0.3)";
+    const priceLineWidth = 2.5;
+    const smaLineWidth = 1.2;
 
     if (!Number.isFinite(baselinePrice)) {
       priceTraces.push({
@@ -45,7 +47,7 @@ if (chartEl) {
             mode: "lines",
             name: "Price",
             showlegend: !hasLegend,
-            line: { color: currentColor },
+            line: { color: currentColor, width: priceLineWidth },
           });
           hasLegend = true;
         }
@@ -98,7 +100,7 @@ if (chartEl) {
           type: "scatter",
           mode: "lines",
           name: "Price",
-          line: { color: greenColor },
+          line: { color: greenColor, width: priceLineWidth },
         });
       }
     }
@@ -112,7 +114,7 @@ if (chartEl) {
         name: "BB Band",
         showlegend: false,
         visible: "legendonly",
-        line: { color: bollingerBandLine },
+        line: { color: bollingerBandLine, width: 1 },
       },
       {
         x: dates,
@@ -124,7 +126,7 @@ if (chartEl) {
         visible: "legendonly",
         fill: "tonexty",
         fillcolor: bollingerBandColor,
-        line: { color: bollingerBandLine },
+        line: { color: bollingerBandLine, width: 1 },
       },
     ];
 
@@ -138,7 +140,7 @@ if (chartEl) {
         mode: "lines",
         name: "SMA 7",
         visible: "legendonly",
-        line: { dash: "dash" },
+        line: { color: "#FF7F0E", width: smaLineWidth },
       },
       {
         x: dates,
@@ -147,7 +149,7 @@ if (chartEl) {
         mode: "lines",
         name: "SMA 30",
         visible: "legendonly",
-        line: { dash: "dash" },
+        line: { color: "#7F7F7F", dash: "dash", width: smaLineWidth },
       },
       {
         x: dates,
@@ -156,7 +158,7 @@ if (chartEl) {
         mode: "lines",
         name: "BB Upper",
         visible: "legendonly",
-        line: { color: bollingerLineColor },
+        line: { color: bollingerLineColor, width: 1 },
       },
       {
         x: dates,
@@ -165,26 +167,25 @@ if (chartEl) {
         mode: "lines",
         name: "BB Lower",
         visible: "legendonly",
-        line: { color: bollingerLineColor },
+        line: { color: bollingerLineColor, width: 1 },
       },
     ];
 
     const layout = {
       margin: { t: 20, r: 20, l: 50, b: 40 },
+      paper_bgcolor: "#FFFFFF",
+      plot_bgcolor: "#FFFFFF",
       xaxis: {
         type: "date",
         rangeslider: { visible: false },
-        rangeselector: {
-          buttons: [
-            { count: 7, label: "7d", step: "day", stepmode: "backward" },
-            { count: 1, label: "1m", step: "month", stepmode: "backward" },
-            { count: 3, label: "3m", step: "month", stepmode: "backward" },
-            { step: "all", label: "All" },
-          ],
-        },
+        showgrid: false,
       },
-      yaxis: { title: `Price (${currency.toUpperCase()})` },
-      legend: { orientation: "h" },
+      yaxis: {
+        title: `Price (${currency.toUpperCase()})`,
+        showgrid: true,
+        gridcolor: "#EAEAEA",
+      },
+      showlegend: false,
     };
 
     Plotly.newPlot("price-chart", data, layout, { responsive: true });
