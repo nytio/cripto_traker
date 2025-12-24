@@ -15,6 +15,9 @@ if (chartEl) {
     const priceTraces = [];
     const greenColor = "#198754";
     const redColor = "#dc3545";
+    const bollingerBandColor = "rgba(140, 108, 214, 0.4)";
+    const bollingerBandLine = "rgba(140, 108, 214, 0)";
+    const bollingerLineColor = "rgba(170, 150, 230, 0.75)";
 
     if (!Number.isFinite(baselinePrice)) {
       priceTraces.push({
@@ -100,7 +103,33 @@ if (chartEl) {
       }
     }
 
+    const bollingerBandTraces = [
+      {
+        x: dates,
+        y: bbLower,
+        type: "scatter",
+        mode: "lines",
+        name: "BB Band",
+        showlegend: false,
+        visible: "legendonly",
+        line: { color: bollingerBandLine },
+      },
+      {
+        x: dates,
+        y: bbUpper,
+        type: "scatter",
+        mode: "lines",
+        name: "BB Band",
+        showlegend: false,
+        visible: "legendonly",
+        fill: "tonexty",
+        fillcolor: bollingerBandColor,
+        line: { color: bollingerBandLine },
+      },
+    ];
+
     const data = [
+      ...bollingerBandTraces,
       ...priceTraces,
       {
         x: dates,
@@ -127,6 +156,7 @@ if (chartEl) {
         mode: "lines",
         name: "BB Upper",
         visible: "legendonly",
+        line: { color: bollingerLineColor },
       },
       {
         x: dates,
@@ -135,6 +165,7 @@ if (chartEl) {
         mode: "lines",
         name: "BB Lower",
         visible: "legendonly",
+        line: { color: bollingerLineColor },
       },
     ];
 
@@ -161,7 +192,10 @@ if (chartEl) {
     const sma7Toggle = document.getElementById("toggle-sma-7");
     const sma30Toggle = document.getElementById("toggle-sma-30");
     const bollingerToggle = document.getElementById("toggle-bollinger");
-    const indicatorOffset = priceTraces.length;
+    const indicatorOffset = bollingerBandTraces.length + priceTraces.length;
+    const bollingerBandIndices = bollingerBandTraces.map((_, index) => index);
+    const bollingerLineIndices = [indicatorOffset + 2, indicatorOffset + 3];
+    const bollingerTraceIndices = [...bollingerBandIndices, ...bollingerLineIndices];
 
     const setVisibility = (traceIndices, visible) => {
       Plotly.restyle(
@@ -183,7 +217,7 @@ if (chartEl) {
     }
     if (bollingerToggle) {
       bollingerToggle.addEventListener("change", (event) => {
-        setVisibility([indicatorOffset + 2, indicatorOffset + 3], event.target.checked);
+        setVisibility(bollingerTraceIndices, event.target.checked);
       });
     }
   }
