@@ -21,6 +21,7 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setenv("COINGECKO_REQUEST_DELAY", "0")
     monkeypatch.setenv("COINGECKO_RETRY_COUNT", "0")
     monkeypatch.setenv("COINGECKO_RETRY_DELAY", "0")
+    monkeypatch.setenv("PROPHET_FUTURE_DAYS", "0")
 
     from app import create_app
 

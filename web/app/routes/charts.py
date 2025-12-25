@@ -44,6 +44,7 @@ def crypto_detail(crypto_id: int):
         crypto=crypto,
         series=series,
         prophet_forecast=forecast,
+        today=date.today().isoformat(),
         currency=current_app.config["COINGECKO_VS_CURRENCY"].upper(),
         days=days,
         max_days=max_days,

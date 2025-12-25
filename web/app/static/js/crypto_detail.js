@@ -16,25 +16,62 @@ if (chartEl) {
       : [];
     const toNumber = (value) =>
       value === null || value === undefined ? null : Number(value);
-    const prophetRows = prophetForecast;
-    const prophetDates = prophetRows.map((row) => row.date);
-    const prophetYhat = prophetRows.map((row) => toNumber(row.yhat));
-    const prophetLower = prophetRows.map((row) => toNumber(row.yhat_lower));
-    const prophetUpper = prophetRows.map((row) => toNumber(row.yhat_upper));
+    const chartColors = {
+      price: "#1F77B4",
+      priceUp: "#2CA02C",
+      priceDown: "#D62728",
+      prophet: "#17BECF",
+      prophetFill: "rgba(23, 190, 207, 0.10)",
+      todayLine: "rgba(160, 160, 160, 0.8)",
+      bollingerBand: "rgba(148, 103, 189, 0.15)",
+      bollingerLine: "rgba(148, 103, 189, 0.3)",
+    };
+    const lineWidths = {
+      price: 2.5,
+      sma: 1.2,
+      prophet: 1.8,
+      prophetHistory: 1.4,
+    };
+    const todayStr = chartEl.dataset.today || new Date().toISOString().slice(0, 10);
+    // Split Prophet into in-sample vs forecast using today (or last observed).
+    const lastObservedDate = series.reduce(
+      (acc, row) => (Number.isFinite(row.price) ? row.date : acc),
+      null
+    );
+    const cutoffDate = lastObservedDate || todayStr;
+    const prophetHistoryRows = cutoffDate
+      ? prophetForecast.filter((row) => row.date <= cutoffDate)
+      : prophetForecast;
+    const prophetFutureRows = cutoffDate
+      ? prophetForecast.filter((row) => row.date >= cutoffDate)
+      : [];
+    const prophetAllDates = prophetForecast.map((row) => row.date);
+    const prophetAllLower = prophetForecast.map((row) =>
+      toNumber(row.yhat_lower)
+    );
+    const prophetAllUpper = prophetForecast.map((row) =>
+      toNumber(row.yhat_upper)
+    );
+    const prophetHistoryDates = prophetHistoryRows.map((row) => row.date);
+    const prophetHistoryYhat = prophetHistoryRows.map((row) =>
+      toNumber(row.yhat)
+    );
+    const prophetFutureDates = prophetFutureRows.map((row) => row.date);
+    const prophetFutureYhat = prophetFutureRows.map((row) =>
+      toNumber(row.yhat)
+    );
 
     const baselinePrice = prices.find((value) => Number.isFinite(value));
     const priceTraces = [];
-    const greenColor = "#2CA02C";
-    const redColor = "#D62728";
-    const bollingerBandColor = "rgba(148, 103, 189, 0.15)";
-    const bollingerBandLine = "rgba(148, 103, 189, 0.3)";
-    const bollingerLineColor = "rgba(148, 103, 189, 0.3)";
-    const prophetBandColor = "rgba(23, 190, 207, 0.10)";
-    const prophetLineColor = "#17BECF";
-    const priceLineWidth = 2.5;
-    const smaLineWidth = 1.2;
-    const prophetLineWidth = 1.6;
-    const priceMonoColor = "#1F77B4";
+    const greenColor = chartColors.priceUp;
+    const redColor = chartColors.priceDown;
+    const bollingerBandColor = chartColors.bollingerBand;
+    const bollingerBandLine = chartColors.bollingerLine;
+    const bollingerLineColor = chartColors.bollingerLine;
+    const prophetLineColor = chartColors.prophet;
+    const priceLineWidth = lineWidths.price;
+    const smaLineWidth = lineWidths.sma;
+    const priceMonoColor = chartColors.price;
 
     if (!Number.isFinite(baselinePrice)) {
       priceTraces.push({
@@ -43,7 +80,8 @@ if (chartEl) {
         type: "scatter",
         mode: "lines",
         name: "Price",
-        line: { color: greenColor },
+        opacity: 1.0,
+        line: { color: greenColor, width: priceLineWidth },
       });
     } else {
       let currentColor = null;
@@ -62,6 +100,7 @@ if (chartEl) {
             mode: "lines",
             name: "Price",
             showlegend: !hasLegend,
+            opacity: 1.0,
             line: { color: currentColor, width: priceLineWidth },
           });
           hasLegend = true;
@@ -115,6 +154,7 @@ if (chartEl) {
           type: "scatter",
           mode: "lines",
           name: "Price",
+          opacity: 1.0,
           line: { color: greenColor, width: priceLineWidth },
         });
       }
@@ -144,29 +184,69 @@ if (chartEl) {
         line: { color: bollingerBandLine, width: 1 },
       },
     ];
-    const prophetBandTraces = [
+    const prophetHasHistory = prophetHistoryYhat.some((value) =>
+      Number.isFinite(value)
+    );
+    const prophetHasFuture = prophetFutureYhat.some((value) =>
+      Number.isFinite(value)
+    );
+    const prophetCiTraces = [
       {
-        x: prophetDates,
-        y: prophetLower,
+        x: prophetAllDates,
+        y: prophetAllLower,
         type: "scatter",
         mode: "lines",
-        name: "Prophet band",
+        name: "Forecast CI",
+        legendgroup: "prophet",
         showlegend: false,
         visible: "legendonly",
-        line: { color: "rgba(23, 190, 207, 0)", width: 0 },
+        line: { color: "rgba(0, 0, 0, 0)", width: 0 },
       },
       {
-        x: prophetDates,
-        y: prophetUpper,
+        x: prophetAllDates,
+        y: prophetAllUpper,
         type: "scatter",
         mode: "lines",
-        name: "Prophet band",
-        showlegend: false,
+        name: "Forecast CI",
+        legendgroup: "prophet",
+        showlegend: prophetHasFuture,
         visible: "legendonly",
         fill: "tonexty",
-        fillcolor: prophetBandColor,
-        line: { color: "rgba(23, 190, 207, 0)", width: 0 },
+        fillcolor: chartColors.prophetFill,
+        line: { color: "rgba(0, 0, 0, 0)", width: 0 },
       },
+    ];
+    const prophetHistoryTrace = {
+      x: prophetHistoryDates,
+      y: prophetHistoryYhat,
+      type: "scatter",
+      mode: "lines",
+      name: "Forecast (Prophet)",
+      legendgroup: "prophet",
+      showlegend: false,
+      visible: "legendonly",
+      opacity: 0.55,
+      line: { color: prophetLineColor, width: lineWidths.prophetHistory },
+    };
+    const prophetFutureTrace = {
+      x: prophetFutureDates,
+      y: prophetFutureYhat,
+      type: "scatter",
+      mode: "lines",
+      name: "Forecast (Prophet)",
+      legendgroup: "prophet",
+      showlegend: prophetHasFuture,
+      visible: "legendonly",
+      opacity: 1.0,
+      line: {
+        color: prophetLineColor,
+        width: lineWidths.prophet,
+      },
+    };
+    const prophetTraces = [
+      ...prophetCiTraces,
+      prophetHistoryTrace,
+      prophetFutureTrace,
     ];
     const priceMonoTrace = {
       x: dates,
@@ -174,24 +254,13 @@ if (chartEl) {
       type: "scatter",
       mode: "lines",
       name: "Price mono",
+      showlegend: false,
       visible: "legendonly",
       line: { color: priceMonoColor, width: priceLineWidth },
     };
-    const prophetLineTrace = {
-      x: prophetDates,
-      y: prophetYhat,
-      type: "scatter",
-      mode: "lines",
-      name: "Prophet",
-      visible: "legendonly",
-      opacity: 1.0,
-      line: { color: prophetLineColor, dash: "solid", width: prophetLineWidth },
-    };
-
     const data = [
       ...bollingerBandTraces,
-      ...prophetBandTraces,
-      prophetLineTrace,
+      ...prophetTraces,
       ...priceTraces,
       priceMonoTrace,
       {
@@ -200,6 +269,7 @@ if (chartEl) {
         type: "scatter",
         mode: "lines",
         name: "SMA 7",
+        showlegend: false,
         visible: "legendonly",
         line: { color: "#FF7F0E", width: smaLineWidth },
       },
@@ -209,6 +279,7 @@ if (chartEl) {
         type: "scatter",
         mode: "lines",
         name: "SMA 30",
+        showlegend: false,
         visible: "legendonly",
         line: { color: "#7F7F7F", dash: "dash", width: smaLineWidth },
       },
@@ -218,6 +289,7 @@ if (chartEl) {
         type: "scatter",
         mode: "lines",
         name: "BB Upper",
+        showlegend: false,
         visible: "legendonly",
         line: { color: bollingerLineColor, width: 1 },
       },
@@ -227,10 +299,23 @@ if (chartEl) {
         type: "scatter",
         mode: "lines",
         name: "BB Lower",
+        showlegend: false,
         visible: "legendonly",
         line: { color: bollingerLineColor, width: 1 },
       },
     ];
+
+    const lineDate = cutoffDate || todayStr;
+    const todayShape = {
+      type: "line",
+      xref: "x",
+      yref: "paper",
+      x0: lineDate,
+      x1: lineDate,
+      y0: 0,
+      y1: 1,
+      line: { color: chartColors.todayLine, width: 1, dash: "dot" },
+    };
 
     const layout = {
       margin: { t: 20, r: 20, l: 50, b: 40 },
@@ -246,6 +331,7 @@ if (chartEl) {
         showgrid: true,
         gridcolor: "#EAEAEA",
       },
+      shapes: [todayShape],
       showlegend: false,
     };
 
@@ -256,19 +342,17 @@ if (chartEl) {
     const bollingerToggle = document.getElementById("toggle-bollinger");
     const prophetToggle = document.getElementById("toggle-prophet");
     const priceModeToggle = document.getElementById("toggle-price-mode");
-    const prophetBandOffset = bollingerBandTraces.length;
-    const prophetBandIndices = prophetBandTraces.map(
-      (_, index) => prophetBandOffset + index
+    const prophetTraceOffset = bollingerBandTraces.length;
+    const prophetTraceIndices = prophetTraces.map(
+      (_, index) => prophetTraceOffset + index
     );
-    const prophetLineIndex = prophetBandOffset + prophetBandTraces.length;
-    const priceTraceOffset = prophetLineIndex + 1;
+    const priceTraceOffset = prophetTraceOffset + prophetTraces.length;
     const priceTraceIndices = priceTraces.map((_, index) => priceTraceOffset + index);
     const priceMonoIndex = priceTraceOffset + priceTraces.length;
     const indicatorOffset = priceMonoIndex + 1;
     const bollingerBandIndices = bollingerBandTraces.map((_, index) => index);
     const bollingerLineIndices = [indicatorOffset + 2, indicatorOffset + 3];
     const bollingerTraceIndices = [...bollingerBandIndices, ...bollingerLineIndices];
-    const prophetTraceIndices = [...prophetBandIndices, prophetLineIndex];
 
     const setVisibility = (traceIndices, visible) => {
       Plotly.restyle(
@@ -299,7 +383,7 @@ if (chartEl) {
         setVisibility(bollingerTraceIndices, event.target.checked);
       });
     }
-    const prophetHasData = prophetYhat.some((value) => Number.isFinite(value));
+    const prophetHasData = prophetHasHistory || prophetHasFuture;
     if (prophetToggle && !prophetHasData) {
       prophetToggle.disabled = true;
       prophetToggle.title = "Prophet sin datos";
