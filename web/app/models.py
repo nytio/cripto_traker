@@ -26,6 +26,9 @@ class Cryptocurrency(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     prices = relationship("Price", back_populates="crypto", cascade="all, delete-orphan")
+    prophet_forecasts = relationship(
+        "ProphetForecast", back_populates="crypto", cascade="all, delete-orphan"
+    )
 
 
 class Price(Base):
@@ -42,6 +45,27 @@ class Price(Base):
     __table_args__ = (
         UniqueConstraint("crypto_id", "date", name="uq_price_crypto_date"),
         Index("ix_prices_crypto_date", "crypto_id", "date"),
+    )
+
+
+class ProphetForecast(Base):
+    __tablename__ = "prophet_forecasts"
+
+    id = Column(Integer, primary_key=True)
+    crypto_id = Column(Integer, ForeignKey("cryptocurrencies.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    yhat = Column(Numeric(18, 8))
+    yhat_lower = Column(Numeric(18, 8))
+    yhat_upper = Column(Numeric(18, 8))
+    cutoff_date = Column(Date, nullable=False)
+    horizon_days = Column(Integer, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    crypto = relationship("Cryptocurrency", back_populates="prophet_forecasts")
+
+    __table_args__ = (
+        UniqueConstraint("crypto_id", "date", name="uq_prophet_crypto_date"),
+        Index("ix_prophet_crypto_date", "crypto_id", "date"),
     )
 
 

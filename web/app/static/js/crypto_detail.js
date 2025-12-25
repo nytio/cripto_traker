@@ -22,7 +22,7 @@ if (chartEl) {
       priceDown: "#D62728",
       prophet: "#17BECF",
       prophetFill: "rgba(23, 190, 207, 0.10)",
-      todayLine: "rgba(160, 160, 160, 0.8)",
+      markerLine: "rgba(160, 160, 160, 0.8)",
       bollingerBand: "rgba(148, 103, 189, 0.15)",
       bollingerLine: "rgba(148, 103, 189, 0.3)",
     };
@@ -32,13 +32,14 @@ if (chartEl) {
       prophet: 1.8,
       prophetHistory: 1.4,
     };
-    const todayStr = chartEl.dataset.today || new Date().toISOString().slice(0, 10);
-    // Split Prophet into in-sample vs forecast using today (or last observed).
+    const prophetCutoff = chartEl.dataset.prophetCutoff || null;
+    const prophetLineDate = chartEl.dataset.prophetLine || null;
+    // Split Prophet into in-sample vs forecast using the stored cutoff date.
     const lastObservedDate = series.reduce(
       (acc, row) => (Number.isFinite(row.price) ? row.date : acc),
       null
     );
-    const cutoffDate = lastObservedDate || todayStr;
+    const cutoffDate = prophetCutoff || lastObservedDate;
     const prophetHistoryRows = cutoffDate
       ? prophetForecast.filter((row) => row.date <= cutoffDate)
       : prophetForecast;
@@ -305,17 +306,19 @@ if (chartEl) {
       },
     ];
 
-    const lineDate = cutoffDate || todayStr;
-    const todayShape = {
-      type: "line",
-      xref: "x",
-      yref: "paper",
-      x0: lineDate,
-      x1: lineDate,
-      y0: 0,
-      y1: 1,
-      line: { color: chartColors.todayLine, width: 1, dash: "dot" },
-    };
+    const lineDate = prophetLineDate || prophetCutoff || null;
+    const markerShape = lineDate
+      ? {
+          type: "line",
+          xref: "x",
+          yref: "paper",
+          x0: lineDate,
+          x1: lineDate,
+          y0: 0,
+          y1: 1,
+          line: { color: chartColors.markerLine, width: 1, dash: "dot" },
+        }
+      : null;
 
     const layout = {
       margin: { t: 20, r: 20, l: 50, b: 40 },
@@ -331,7 +334,7 @@ if (chartEl) {
         showgrid: true,
         gridcolor: "#EAEAEA",
       },
-      shapes: [todayShape],
+      shapes: [],
       showlegend: false,
     };
 
@@ -391,6 +394,11 @@ if (chartEl) {
     if (prophetToggle) {
       prophetToggle.addEventListener("change", (event) => {
         setVisibility(prophetTraceIndices, event.target.checked);
+        if (markerShape) {
+          Plotly.relayout("price-chart", {
+            shapes: event.target.checked ? [markerShape] : [],
+          });
+        }
         if (event.target.checked) {
           refreshAxes();
         }
