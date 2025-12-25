@@ -99,6 +99,7 @@ def _train_rnn(series, model_type: str, horizon_days: int, future_covariates=Non
     input_chunk = max(5, min(30, series_len // 4))
     if input_chunk + output_chunk > series_len:
         input_chunk = max(3, series_len - output_chunk)
+    training_length = min(series_len, input_chunk * 2)
 
     trainer_kwargs = {
         "accelerator": "cpu",
@@ -114,6 +115,7 @@ def _train_rnn(series, model_type: str, horizon_days: int, future_covariates=Non
         model=model_type,
         input_chunk_length=input_chunk,
         output_chunk_length=output_chunk,
+        training_length=training_length,
         n_epochs=100,
         batch_size=32,
         dropout=0.1,
