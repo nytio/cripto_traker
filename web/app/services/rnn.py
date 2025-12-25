@@ -16,10 +16,12 @@ try:
     from darts import TimeSeries
     from darts.dataprocessing.transformers import Scaler
     from darts.models import RNNModel
+    from pytorch_lightning.callbacks import EarlyStopping
 except ImportError:  # pragma: no cover - optional dependency fallback
     TimeSeries = None
     RNNModel = None
     Scaler = None
+    EarlyStopping = None
 
 logger = logging.getLogger(__name__)
 
@@ -98,18 +100,25 @@ def _train_rnn(series, model_type: str, horizon_days: int, future_covariates=Non
     if input_chunk + output_chunk > series_len:
         input_chunk = max(3, series_len - output_chunk)
 
+    trainer_kwargs = {
+        "accelerator": "cpu",
+        "logger": False,
+        "enable_progress_bar": False,
+    }
+    if EarlyStopping is not None:
+        trainer_kwargs["callbacks"] = [
+            EarlyStopping(monitor="train_loss", patience=10)
+        ]
+
     model = RNNModel(
         model=model_type,
         input_chunk_length=input_chunk,
         output_chunk_length=output_chunk,
         n_epochs=100,
         batch_size=32,
+        dropout=0.1,
         random_state=42,
-        pl_trainer_kwargs={
-            "accelerator": "cpu",
-            "logger": False,
-            "enable_progress_bar": False,
-        },
+        pl_trainer_kwargs=trainer_kwargs,
     )
     model.fit(series, future_covariates=future_covariates, verbose=False)
     return model, input_chunk
@@ -174,7 +183,8 @@ def _compute_forecast(
     seen_dates = set()
 
     for point_date, prediction in historical_points:
-        if point_date in seen_dates:
+        output_date = point_date - timedelta(days=1)
+        if output_date in seen_dates:
             continue
         prev_date = point_date - timedelta(days=1)
         prev_price = price_by_date.get(prev_date)
@@ -185,25 +195,26 @@ def _compute_forecast(
         upper = prev_price * math.exp(prediction + ci_width)
         forecast_rows.append(
             {
-                "date": point_date,
+                "date": output_date,
                 "yhat": price_hat,
                 "yhat_lower": lower,
                 "yhat_upper": upper,
             }
         )
-        seen_dates.add(point_date)
+        seen_dates.add(output_date)
 
     last_price_date = price_df["date"].iloc[-1].date()
     prev_price = price_by_date.get(last_price_date)
     for point_date, prediction in future_points:
         if prev_price is None:
             break
+        output_date = point_date - timedelta(days=1)
         price_hat = prev_price * math.exp(prediction)
         lower = prev_price * math.exp(prediction - ci_width)
         upper = prev_price * math.exp(prediction + ci_width)
         forecast_rows.append(
             {
-                "date": point_date,
+                "date": output_date,
                 "yhat": price_hat,
                 "yhat_lower": lower,
                 "yhat_upper": upper,
