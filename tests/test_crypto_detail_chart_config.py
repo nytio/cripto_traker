@@ -37,17 +37,12 @@ def test_crypto_detail_includes_prophet_line_data(client, app):
 
 def test_prophet_chart_styles_present():
     content = Path("web/app/static/js/crypto_detail.js").read_text()
-    history_start = content.index("const prophetHistoryTrace")
-    future_start = content.index("const prophetFutureTrace")
-    trace_end = content.index("const prophetTraces")
-    history_block = content[history_start:future_start]
-    future_block = content[future_start:trace_end]
+    build_start = content.index("const buildForecastTraces")
+    build_end = content.index("const buildMarkerShape")
+    build_block = content[build_start:build_end]
 
-    assert "dash:" not in history_block
-    assert "dash:" not in future_block
-    assert 'name: "Forecast (Prophet)"' in content
-    assert 'name: "Forecast CI"' in content
+    assert "dash" not in build_block
     assert 'prophetFill: "rgba(23, 190, 207, 0.10)"' in content
+    assert 'fill: "tonexty"' in content
     assert 'line: { color: "rgba(0, 0, 0, 0)", width: 0 }' in content
-    assert "markerLine" in content
     assert "showlegend: false" in content

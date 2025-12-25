@@ -14,6 +14,10 @@ if (chartEl) {
     const prophetForecast = Array.isArray(prophetForecastRaw)
       ? prophetForecastRaw
       : [];
+    const lstmForecastRaw = JSON.parse(chartEl.dataset.lstm || "[]");
+    const lstmForecast = Array.isArray(lstmForecastRaw) ? lstmForecastRaw : [];
+    const gruForecastRaw = JSON.parse(chartEl.dataset.gru || "[]");
+    const gruForecast = Array.isArray(gruForecastRaw) ? gruForecastRaw : [];
     const toNumber = (value) =>
       value === null || value === undefined ? null : Number(value);
     const chartColors = {
@@ -22,6 +26,10 @@ if (chartEl) {
       priceDown: "#D62728",
       prophet: "#17BECF",
       prophetFill: "rgba(23, 190, 207, 0.10)",
+      lstm: "#2CA02C",
+      lstmFill: "rgba(44, 160, 44, 0.10)",
+      gru: "#E377C2",
+      gruFill: "rgba(227, 119, 194, 0.10)",
       markerLine: "rgba(160, 160, 160, 0.8)",
       bollingerBand: "rgba(148, 103, 189, 0.15)",
       bollingerLine: "rgba(148, 103, 189, 0.3)",
@@ -29,38 +37,117 @@ if (chartEl) {
     const lineWidths = {
       price: 2.5,
       sma: 1.2,
-      prophet: 1.8,
+      prophet: 1.6,
       prophetHistory: 1.4,
+      rnn: 1.6,
+      rnnHistory: 1.2,
     };
     const prophetCutoff = chartEl.dataset.prophetCutoff || null;
     const prophetLineDate = chartEl.dataset.prophetLine || null;
-    // Split Prophet into in-sample vs forecast using the stored cutoff date.
+    const lstmCutoff = chartEl.dataset.lstmCutoff || null;
+    const lstmLineDate = chartEl.dataset.lstmLine || null;
+    const gruCutoff = chartEl.dataset.gruCutoff || null;
+    const gruLineDate = chartEl.dataset.gruLine || null;
+    const buildForecastTraces = ({
+      rows,
+      cutoffDate,
+      color,
+      fillColor,
+      historyWidth,
+      futureWidth,
+      historyOpacity,
+      futureOpacity,
+      name,
+    }) => {
+      const safeRows = Array.isArray(rows) ? rows : [];
+      const historyRows = cutoffDate
+        ? safeRows.filter((row) => row.date <= cutoffDate)
+        : safeRows;
+      const futureRows = cutoffDate
+        ? safeRows.filter((row) => row.date >= cutoffDate)
+        : [];
+      const allDates = safeRows.map((row) => row.date);
+      const allLower = safeRows.map((row) => toNumber(row.yhat_lower));
+      const allUpper = safeRows.map((row) => toNumber(row.yhat_upper));
+      const historyDates = historyRows.map((row) => row.date);
+      const historyYhat = historyRows.map((row) => toNumber(row.yhat));
+      const futureDates = futureRows.map((row) => row.date);
+      const futureYhat = futureRows.map((row) => toNumber(row.yhat));
+      const hasHistory = historyYhat.some((value) => Number.isFinite(value));
+      const hasFuture = futureYhat.some((value) => Number.isFinite(value));
+
+      const ciTraces = [
+        {
+          x: allDates,
+          y: allLower,
+          type: "scatter",
+          mode: "lines",
+          name: `${name} CI`,
+          showlegend: false,
+          visible: "legendonly",
+          line: { color: "rgba(0, 0, 0, 0)", width: 0 },
+        },
+        {
+          x: allDates,
+          y: allUpper,
+          type: "scatter",
+          mode: "lines",
+          name: `${name} CI`,
+          showlegend: false,
+          visible: "legendonly",
+          fill: "tonexty",
+          fillcolor: fillColor,
+          line: { color: "rgba(0, 0, 0, 0)", width: 0 },
+        },
+      ];
+      const historyTrace = {
+        x: historyDates,
+        y: historyYhat,
+        type: "scatter",
+        mode: "lines",
+        name,
+        showlegend: false,
+        visible: "legendonly",
+        opacity: historyOpacity,
+        line: { color, width: historyWidth },
+      };
+      const futureTrace = {
+        x: futureDates,
+        y: futureYhat,
+        type: "scatter",
+        mode: "lines",
+        name,
+        showlegend: false,
+        visible: "legendonly",
+        opacity: futureOpacity,
+        line: { color, width: futureWidth },
+      };
+      return {
+        traces: [...ciTraces, historyTrace, futureTrace],
+        hasData: hasHistory || hasFuture,
+      };
+    };
+    const buildMarkerShape = (lineDate) =>
+      lineDate
+        ? {
+            type: "line",
+            xref: "x",
+            yref: "paper",
+            x0: lineDate,
+            x1: lineDate,
+            y0: 0,
+            y1: 1,
+            line: { color: chartColors.markerLine, width: 1, dash: "dot" },
+          }
+        : null;
+    // Split forecasts into in-sample vs future using stored cutoff dates.
     const lastObservedDate = series.reduce(
       (acc, row) => (Number.isFinite(row.price) ? row.date : acc),
       null
     );
-    const cutoffDate = prophetCutoff || lastObservedDate;
-    const prophetHistoryRows = cutoffDate
-      ? prophetForecast.filter((row) => row.date <= cutoffDate)
-      : prophetForecast;
-    const prophetFutureRows = cutoffDate
-      ? prophetForecast.filter((row) => row.date >= cutoffDate)
-      : [];
-    const prophetAllDates = prophetForecast.map((row) => row.date);
-    const prophetAllLower = prophetForecast.map((row) =>
-      toNumber(row.yhat_lower)
-    );
-    const prophetAllUpper = prophetForecast.map((row) =>
-      toNumber(row.yhat_upper)
-    );
-    const prophetHistoryDates = prophetHistoryRows.map((row) => row.date);
-    const prophetHistoryYhat = prophetHistoryRows.map((row) =>
-      toNumber(row.yhat)
-    );
-    const prophetFutureDates = prophetFutureRows.map((row) => row.date);
-    const prophetFutureYhat = prophetFutureRows.map((row) =>
-      toNumber(row.yhat)
-    );
+    const prophetCutoffDate = prophetCutoff || lastObservedDate;
+    const lstmCutoffDate = lstmCutoff || lastObservedDate;
+    const gruCutoffDate = gruCutoff || lastObservedDate;
 
     const baselinePrice = prices.find((value) => Number.isFinite(value));
     const priceTraces = [];
@@ -69,7 +156,6 @@ if (chartEl) {
     const bollingerBandColor = chartColors.bollingerBand;
     const bollingerBandLine = chartColors.bollingerLine;
     const bollingerLineColor = chartColors.bollingerLine;
-    const prophetLineColor = chartColors.prophet;
     const priceLineWidth = lineWidths.price;
     const smaLineWidth = lineWidths.sma;
     const priceMonoColor = chartColors.price;
@@ -185,70 +271,42 @@ if (chartEl) {
         line: { color: bollingerBandLine, width: 1 },
       },
     ];
-    const prophetHasHistory = prophetHistoryYhat.some((value) =>
-      Number.isFinite(value)
-    );
-    const prophetHasFuture = prophetFutureYhat.some((value) =>
-      Number.isFinite(value)
-    );
-    const prophetCiTraces = [
-      {
-        x: prophetAllDates,
-        y: prophetAllLower,
-        type: "scatter",
-        mode: "lines",
-        name: "Forecast CI",
-        legendgroup: "prophet",
-        showlegend: false,
-        visible: "legendonly",
-        line: { color: "rgba(0, 0, 0, 0)", width: 0 },
-      },
-      {
-        x: prophetAllDates,
-        y: prophetAllUpper,
-        type: "scatter",
-        mode: "lines",
-        name: "Forecast CI",
-        legendgroup: "prophet",
-        showlegend: prophetHasFuture,
-        visible: "legendonly",
-        fill: "tonexty",
-        fillcolor: chartColors.prophetFill,
-        line: { color: "rgba(0, 0, 0, 0)", width: 0 },
-      },
-    ];
-    const prophetHistoryTrace = {
-      x: prophetHistoryDates,
-      y: prophetHistoryYhat,
-      type: "scatter",
-      mode: "lines",
-      name: "Forecast (Prophet)",
-      legendgroup: "prophet",
-      showlegend: false,
-      visible: "legendonly",
-      opacity: 0.55,
-      line: { color: prophetLineColor, width: lineWidths.prophetHistory },
-    };
-    const prophetFutureTrace = {
-      x: prophetFutureDates,
-      y: prophetFutureYhat,
-      type: "scatter",
-      mode: "lines",
-      name: "Forecast (Prophet)",
-      legendgroup: "prophet",
-      showlegend: prophetHasFuture,
-      visible: "legendonly",
-      opacity: 1.0,
-      line: {
-        color: prophetLineColor,
-        width: lineWidths.prophet,
-      },
-    };
-    const prophetTraces = [
-      ...prophetCiTraces,
-      prophetHistoryTrace,
-      prophetFutureTrace,
-    ];
+    const prophetBundle = buildForecastTraces({
+      rows: prophetForecast,
+      cutoffDate: prophetCutoffDate,
+      color: chartColors.prophet,
+      fillColor: chartColors.prophetFill,
+      historyWidth: lineWidths.prophetHistory,
+      futureWidth: lineWidths.prophet,
+      historyOpacity: 0.55,
+      futureOpacity: 1.0,
+      name: "Prophet",
+    });
+    const lstmBundle = buildForecastTraces({
+      rows: lstmForecast,
+      cutoffDate: lstmCutoffDate,
+      color: chartColors.lstm,
+      fillColor: chartColors.lstmFill,
+      historyWidth: lineWidths.rnnHistory,
+      futureWidth: lineWidths.rnn,
+      historyOpacity: 0.55,
+      futureOpacity: 1.0,
+      name: "LSTM",
+    });
+    const gruBundle = buildForecastTraces({
+      rows: gruForecast,
+      cutoffDate: gruCutoffDate,
+      color: chartColors.gru,
+      fillColor: chartColors.gruFill,
+      historyWidth: lineWidths.rnnHistory,
+      futureWidth: lineWidths.rnn,
+      historyOpacity: 0.55,
+      futureOpacity: 1.0,
+      name: "GRU",
+    });
+    const prophetTraces = prophetBundle.traces;
+    const lstmTraces = lstmBundle.traces;
+    const gruTraces = gruBundle.traces;
     const priceMonoTrace = {
       x: dates,
       y: prices,
@@ -262,6 +320,8 @@ if (chartEl) {
     const data = [
       ...bollingerBandTraces,
       ...prophetTraces,
+      ...lstmTraces,
+      ...gruTraces,
       ...priceTraces,
       priceMonoTrace,
       {
@@ -306,19 +366,9 @@ if (chartEl) {
       },
     ];
 
-    const lineDate = prophetLineDate || prophetCutoff || null;
-    const markerShape = lineDate
-      ? {
-          type: "line",
-          xref: "x",
-          yref: "paper",
-          x0: lineDate,
-          x1: lineDate,
-          y0: 0,
-          y1: 1,
-          line: { color: chartColors.markerLine, width: 1, dash: "dot" },
-        }
-      : null;
+    const prophetMarker = buildMarkerShape(prophetLineDate || prophetCutoffDate);
+    const lstmMarker = buildMarkerShape(lstmLineDate || lstmCutoffDate);
+    const gruMarker = buildMarkerShape(gruLineDate || gruCutoffDate);
 
     const layout = {
       margin: { t: 20, r: 20, l: 50, b: 40 },
@@ -344,12 +394,20 @@ if (chartEl) {
     const sma30Toggle = document.getElementById("toggle-sma-30");
     const bollingerToggle = document.getElementById("toggle-bollinger");
     const prophetToggle = document.getElementById("toggle-prophet");
+    const lstmToggle = document.getElementById("toggle-lstm");
+    const gruToggle = document.getElementById("toggle-gru");
     const priceModeToggle = document.getElementById("toggle-price-mode");
     const prophetTraceOffset = bollingerBandTraces.length;
     const prophetTraceIndices = prophetTraces.map(
       (_, index) => prophetTraceOffset + index
     );
-    const priceTraceOffset = prophetTraceOffset + prophetTraces.length;
+    const lstmTraceOffset = prophetTraceOffset + prophetTraces.length;
+    const lstmTraceIndices = lstmTraces.map(
+      (_, index) => lstmTraceOffset + index
+    );
+    const gruTraceOffset = lstmTraceOffset + lstmTraces.length;
+    const gruTraceIndices = gruTraces.map((_, index) => gruTraceOffset + index);
+    const priceTraceOffset = gruTraceOffset + gruTraces.length;
     const priceTraceIndices = priceTraces.map((_, index) => priceTraceOffset + index);
     const priceMonoIndex = priceTraceOffset + priceTraces.length;
     const indicatorOffset = priceMonoIndex + 1;
@@ -370,6 +428,15 @@ if (chartEl) {
         "yaxis.autorange": true,
       });
     };
+    const activeMarkers = {
+      prophet: null,
+      lstm: null,
+      gru: null,
+    };
+    const updateMarkers = () => {
+      const shapes = Object.values(activeMarkers).filter(Boolean);
+      Plotly.relayout("price-chart", { shapes });
+    };
 
     if (sma7Toggle) {
       sma7Toggle.addEventListener("change", (event) => {
@@ -386,7 +453,9 @@ if (chartEl) {
         setVisibility(bollingerTraceIndices, event.target.checked);
       });
     }
-    const prophetHasData = prophetHasHistory || prophetHasFuture;
+    const prophetHasData = prophetBundle.hasData;
+    const lstmHasData = lstmBundle.hasData;
+    const gruHasData = gruBundle.hasData;
     if (prophetToggle && !prophetHasData) {
       prophetToggle.disabled = true;
       prophetToggle.title = "Prophet sin datos";
@@ -394,10 +463,41 @@ if (chartEl) {
     if (prophetToggle) {
       prophetToggle.addEventListener("change", (event) => {
         setVisibility(prophetTraceIndices, event.target.checked);
-        if (markerShape) {
-          Plotly.relayout("price-chart", {
-            shapes: event.target.checked ? [markerShape] : [],
-          });
+        if (prophetMarker) {
+          activeMarkers.prophet = event.target.checked ? prophetMarker : null;
+          updateMarkers();
+        }
+        if (event.target.checked) {
+          refreshAxes();
+        }
+      });
+    }
+    if (lstmToggle && !lstmHasData) {
+      lstmToggle.disabled = true;
+      lstmToggle.title = "LSTM sin datos";
+    }
+    if (lstmToggle) {
+      lstmToggle.addEventListener("change", (event) => {
+        setVisibility(lstmTraceIndices, event.target.checked);
+        if (lstmMarker) {
+          activeMarkers.lstm = event.target.checked ? lstmMarker : null;
+          updateMarkers();
+        }
+        if (event.target.checked) {
+          refreshAxes();
+        }
+      });
+    }
+    if (gruToggle && !gruHasData) {
+      gruToggle.disabled = true;
+      gruToggle.title = "GRU sin datos";
+    }
+    if (gruToggle) {
+      gruToggle.addEventListener("change", (event) => {
+        setVisibility(gruTraceIndices, event.target.checked);
+        if (gruMarker) {
+          activeMarkers.gru = event.target.checked ? gruMarker : null;
+          updateMarkers();
         }
         if (event.target.checked) {
           refreshAxes();

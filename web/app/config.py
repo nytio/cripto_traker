@@ -30,6 +30,8 @@ class Config:
         self.PROPHET_FUTURE_DAYS = (
             int(prophet_days_raw) if prophet_days_raw.isdigit() else 30
         )
+        rnn_days_raw = os.environ.get("RNN_FUTURE_DAYS", "30").strip()
+        self.RNN_FUTURE_DAYS = int(rnn_days_raw) if rnn_days_raw.isdigit() else 30
         self.LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
         self.WTF_CSRF_TIME_LIMIT = 3600
         self.SESSION_COOKIE_HTTPONLY = True

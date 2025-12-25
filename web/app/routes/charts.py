@@ -1,6 +1,15 @@
 from datetime import date, timedelta
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from sqlalchemy import select
 
 from ..db import get_session
@@ -10,6 +19,14 @@ from ..services.prophet import (
     fetch_prophet_forecast,
     fetch_prophet_meta,
     store_prophet_forecast,
+)
+from ..services.rnn import (
+    fetch_gru_forecast,
+    fetch_gru_meta,
+    fetch_lstm_forecast,
+    fetch_lstm_meta,
+    store_gru_forecast,
+    store_lstm_forecast,
 )
 from ..services.series import clamp_days, fetch_price_series
 
@@ -39,6 +56,20 @@ def crypto_detail(crypto_id: int):
     prophet_line_date = (
         prophet_cutoff_date.isoformat() if prophet_cutoff_date else None
     )
+
+    lstm_forecast = fetch_lstm_forecast(session, crypto_id, start_date)
+    lstm_cutoff_date, _lstm_horizon_days = fetch_lstm_meta(
+        session, crypto_id
+    )
+    lstm_line_date = (
+        lstm_cutoff_date.isoformat() if lstm_cutoff_date else None
+    )
+
+    gru_forecast = fetch_gru_forecast(session, crypto_id, start_date)
+    gru_cutoff_date, _gru_horizon_days = fetch_gru_meta(
+        session, crypto_id
+    )
+    gru_line_date = gru_cutoff_date.isoformat() if gru_cutoff_date else None
     return render_template(
         "crypto_detail.html",
         crypto=crypto,
@@ -48,6 +79,12 @@ def crypto_detail(crypto_id: int):
         if prophet_cutoff_date
         else None,
         prophet_line_date=prophet_line_date,
+        lstm_forecast=lstm_forecast,
+        lstm_cutoff=lstm_cutoff_date.isoformat() if lstm_cutoff_date else None,
+        lstm_line_date=lstm_line_date,
+        gru_forecast=gru_forecast,
+        gru_cutoff=gru_cutoff_date.isoformat() if gru_cutoff_date else None,
+        gru_line_date=gru_line_date,
         currency=current_app.config["COINGECKO_VS_CURRENCY"].upper(),
         days=days,
         max_days=max_days,
@@ -82,4 +119,68 @@ def recalculate_prophet(crypto_id: int):
         flash(f"Prophet updated: {stored} points", "success")
     else:
         flash("Prophet forecast not available", "error")
+    return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+
+@bp.post("/cryptos/<int:crypto_id>/lstm")
+def recalculate_lstm(crypto_id: int):
+    session = get_session()
+    crypto = session.execute(
+        select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
+    ).scalar_one_or_none()
+    if not crypto:
+        abort(404)
+
+    horizon_days = current_app.config.get("RNN_FUTURE_DAYS", 30)
+    if horizon_days <= 0:
+        flash("LSTM forecast disabled", "error")
+        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+    rows = fetch_price_series(session, crypto_id, 0)
+    if len(rows) < 5:
+        flash("Not enough price history for LSTM", "error")
+        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+    try:
+        stored = store_lstm_forecast(session, crypto_id, rows, horizon_days)
+    except Exception as exc:
+        flash(f"Failed to compute LSTM: {exc}", "error")
+        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+    if stored:
+        flash(f"LSTM updated: {stored} points", "success")
+    else:
+        flash("LSTM forecast not available", "error")
+    return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+
+@bp.post("/cryptos/<int:crypto_id>/gru")
+def recalculate_gru(crypto_id: int):
+    session = get_session()
+    crypto = session.execute(
+        select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
+    ).scalar_one_or_none()
+    if not crypto:
+        abort(404)
+
+    horizon_days = current_app.config.get("RNN_FUTURE_DAYS", 30)
+    if horizon_days <= 0:
+        flash("GRU forecast disabled", "error")
+        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+    rows = fetch_price_series(session, crypto_id, 0)
+    if len(rows) < 5:
+        flash("Not enough price history for GRU", "error")
+        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+    try:
+        stored = store_gru_forecast(session, crypto_id, rows, horizon_days)
+    except Exception as exc:
+        flash(f"Failed to compute GRU: {exc}", "error")
+        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+    if stored:
+        flash(f"GRU updated: {stored} points", "success")
+    else:
+        flash("GRU forecast not available", "error")
     return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))

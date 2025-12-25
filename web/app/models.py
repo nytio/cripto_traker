@@ -29,6 +29,12 @@ class Cryptocurrency(Base):
     prophet_forecasts = relationship(
         "ProphetForecast", back_populates="crypto", cascade="all, delete-orphan"
     )
+    lstm_forecasts = relationship(
+        "LstmForecast", back_populates="crypto", cascade="all, delete-orphan"
+    )
+    gru_forecasts = relationship(
+        "GruForecast", back_populates="crypto", cascade="all, delete-orphan"
+    )
 
 
 class Price(Base):
@@ -66,6 +72,48 @@ class ProphetForecast(Base):
     __table_args__ = (
         UniqueConstraint("crypto_id", "date", name="uq_prophet_crypto_date"),
         Index("ix_prophet_crypto_date", "crypto_id", "date"),
+    )
+
+
+class LstmForecast(Base):
+    __tablename__ = "lstm_forecasts"
+
+    id = Column(Integer, primary_key=True)
+    crypto_id = Column(Integer, ForeignKey("cryptocurrencies.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    yhat = Column(Numeric(18, 8))
+    yhat_lower = Column(Numeric(18, 8))
+    yhat_upper = Column(Numeric(18, 8))
+    cutoff_date = Column(Date, nullable=False)
+    horizon_days = Column(Integer, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    crypto = relationship("Cryptocurrency", back_populates="lstm_forecasts")
+
+    __table_args__ = (
+        UniqueConstraint("crypto_id", "date", name="uq_lstm_crypto_date"),
+        Index("ix_lstm_crypto_date", "crypto_id", "date"),
+    )
+
+
+class GruForecast(Base):
+    __tablename__ = "gru_forecasts"
+
+    id = Column(Integer, primary_key=True)
+    crypto_id = Column(Integer, ForeignKey("cryptocurrencies.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    yhat = Column(Numeric(18, 8))
+    yhat_lower = Column(Numeric(18, 8))
+    yhat_upper = Column(Numeric(18, 8))
+    cutoff_date = Column(Date, nullable=False)
+    horizon_days = Column(Integer, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    crypto = relationship("Cryptocurrency", back_populates="gru_forecasts")
+
+    __table_args__ = (
+        UniqueConstraint("crypto_id", "date", name="uq_gru_crypto_date"),
+        Index("ix_gru_crypto_date", "crypto_id", "date"),
     )
 
 
