@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 import logging
+import math
 from typing import Any, Type
 
 import numpy as np
@@ -29,7 +30,7 @@ def _to_decimal(value: float | None) -> Decimal | None:
     return Decimal(str(value))
 
 
-def _build_series(rows: list[dict[str, Any]]):
+def _build_price_frame(rows: list[dict[str, Any]]):
     if TimeSeries is None:
         return None
     df = pd.DataFrame(rows)
@@ -41,7 +42,20 @@ def _build_series(rows: list[dict[str, Any]]):
     df = df.set_index("date").asfreq("D")
     df["price"] = df["price"].ffill()
     df = df.reset_index()
-    return TimeSeries.from_dataframe(df, time_col="date", value_cols="price")
+    df["log_price"] = np.log(df["price"])
+    df["log_return"] = df["log_price"].diff()
+    return df
+
+
+def _build_return_series(price_df: pd.DataFrame):
+    if TimeSeries is None:
+        return None
+    returns_df = price_df.dropna(subset=["log_return"])
+    if returns_df.empty:
+        return None
+    return TimeSeries.from_dataframe(
+        returns_df, time_col="date", value_cols="log_return"
+    )
 
 
 def _build_covariates(rows: list[dict[str, Any]], horizon_days: int):
@@ -110,10 +124,12 @@ def _compute_forecast(
     if horizon_days <= 0 or len(rows) < 5:
         return []
 
-    series = _build_series(rows)
+    price_df = _build_price_frame(rows)
+    if price_df is None or len(price_df) < 6:
+        return []
+    series = _build_return_series(price_df)
     if series is None or len(series) < 5:
         return []
-
     scaler = Scaler() if Scaler is not None else None
     scaled_series = scaler.fit_transform(series) if scaler else series
     covariates = _build_covariates(rows, horizon_days)
@@ -134,11 +150,14 @@ def _compute_forecast(
         adjusted = scaler.inverse_transform(forecast) if scaler else forecast
         historical_points.extend(_extract_points(adjusted))
 
-    actual_by_date = {row["date"]: float(row["price"]) for row in rows}
+    actual_returns = {
+        row["date"].date(): float(row["log_return"])
+        for _, row in price_df.dropna(subset=["log_return"]).iterrows()
+    }
     residuals = [
-        actual_by_date[point_date] - prediction
+        actual_returns[point_date] - prediction
         for point_date, prediction in historical_points
-        if point_date in actual_by_date
+        if point_date in actual_returns
     ]
     sigma = float(np.std(residuals)) if residuals else 0.0
     ci_width = 1.96 * sigma
@@ -147,25 +166,50 @@ def _compute_forecast(
     adjusted_future = scaler.inverse_transform(future) if scaler else future
     future_points = _extract_points(adjusted_future)
 
-    forecast_map: dict[date, float] = {}
-    for point_date, prediction in historical_points:
-        forecast_map[point_date] = prediction
-    for point_date, prediction in future_points:
-        forecast_map[point_date] = prediction
-
+    price_by_date = {
+        row["date"].date(): float(row["price"])
+        for _, row in price_df.iterrows()
+    }
     forecast_rows = []
-    for point_date in sorted(forecast_map):
-        prediction = forecast_map[point_date]
-        lower = prediction - ci_width
-        upper = prediction + ci_width
+    seen_dates = set()
+
+    for point_date, prediction in historical_points:
+        if point_date in seen_dates:
+            continue
+        prev_date = point_date - timedelta(days=1)
+        prev_price = price_by_date.get(prev_date)
+        if prev_price is None:
+            continue
+        price_hat = prev_price * math.exp(prediction)
+        lower = prev_price * math.exp(prediction - ci_width)
+        upper = prev_price * math.exp(prediction + ci_width)
         forecast_rows.append(
             {
                 "date": point_date,
-                "yhat": prediction,
+                "yhat": price_hat,
                 "yhat_lower": lower,
                 "yhat_upper": upper,
             }
         )
+        seen_dates.add(point_date)
+
+    last_price_date = price_df["date"].iloc[-1].date()
+    prev_price = price_by_date.get(last_price_date)
+    for point_date, prediction in future_points:
+        if prev_price is None:
+            break
+        price_hat = prev_price * math.exp(prediction)
+        lower = prev_price * math.exp(prediction - ci_width)
+        upper = prev_price * math.exp(prediction + ci_width)
+        forecast_rows.append(
+            {
+                "date": point_date,
+                "yhat": price_hat,
+                "yhat_lower": lower,
+                "yhat_upper": upper,
+            }
+        )
+        prev_price = price_hat
 
     return forecast_rows
 
