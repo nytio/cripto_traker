@@ -40,6 +40,30 @@ class Config:
             self.COINGECKO_RETRY_DELAY = float(retry_delay_raw)
         except ValueError:
             self.COINGECKO_RETRY_DELAY = 1.0
+        coincap_base_url_raw = os.environ.get("COINCAP_BASE_URL", "").strip()
+        if not coincap_base_url_raw:
+            coincap_base_url_raw = "https://api.coincap.io/v2"
+        coincap_base_url = (
+            coincap_base_url_raw.split("?", 1)[0]
+            .split("#", 1)[0]
+            .rstrip("/")
+        )
+        self.COINCAP_BASE_URL = coincap_base_url or "https://api.coincap.io/v2"
+        self.COINCAP_API_KEY = os.environ.get("COINCAP_API_KEY", "").strip()
+        coincap_delay_raw = os.environ.get("COINCAP_REQUEST_DELAY", "1.1").strip()
+        try:
+            self.COINCAP_REQUEST_DELAY = float(coincap_delay_raw)
+        except ValueError:
+            self.COINCAP_REQUEST_DELAY = 1.1
+        coincap_retry_raw = os.environ.get("COINCAP_RETRY_COUNT", "2").strip()
+        self.COINCAP_RETRY_COUNT = (
+            int(coincap_retry_raw) if coincap_retry_raw.isdigit() else 2
+        )
+        coincap_retry_delay_raw = os.environ.get("COINCAP_RETRY_DELAY", "1.0").strip()
+        try:
+            self.COINCAP_RETRY_DELAY = float(coincap_retry_delay_raw)
+        except ValueError:
+            self.COINCAP_RETRY_DELAY = 1.0
         prophet_days_raw = os.environ.get("PROPHET_FUTURE_DAYS", "30").strip()
         self.PROPHET_FUTURE_DAYS = (
             int(prophet_days_raw) if prophet_days_raw.isdigit() else 30

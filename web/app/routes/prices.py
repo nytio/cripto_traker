@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from flask import Blueprint, current_app, flash, redirect, request, url_for
 
 from ..services.coingecko import CoinGeckoClient
+from ..services.coincap import CoincapClient
 from ..services.price_updater import (
     backfill_historical_prices,
     update_daily_prices,
@@ -90,8 +91,15 @@ def backfill_prices(crypto_id: int):
         api_key=current_app.config["COINGECKO_API_KEY"],
         api_key_header=current_app.config["COINGECKO_API_KEY_HEADER"],
     )
+    coincap_client = CoincapClient(
+        current_app.config["COINCAP_BASE_URL"],
+        retry_count=current_app.config["COINCAP_RETRY_COUNT"],
+        retry_delay=current_app.config["COINCAP_RETRY_DELAY"],
+        api_key=current_app.config["COINCAP_API_KEY"],
+    )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
     request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
+    coincap_request_delay = current_app.config["COINCAP_REQUEST_DELAY"]
 
     try:
         result = backfill_historical_prices(
@@ -102,6 +110,8 @@ def backfill_prices(crypto_id: int):
             request_delay=request_delay,
             max_history_days=max_days,
             max_request_days=backfill_max_days,
+            coincap_client=coincap_client,
+            coincap_request_delay=coincap_request_delay,
         )
         if result["requested"] == 0:
             flash("History already complete for this range", "success")

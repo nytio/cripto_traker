@@ -10,10 +10,12 @@ from sqlalchemy import func, select
 
 from ..db import get_session
 from ..models import Cryptocurrency, Price
+from .coingecko import CoinGeckoClient, CoinGeckoError
+from .coincap import CoincapClient, CoincapError
 
 MAX_HISTORY_DAYS_DEFAULT = 3650
 MAX_BACKFILL_CHUNK_DAYS = 365
-from .coingecko import CoinGeckoClient, CoinGeckoError
+COINGECKO_DAILY_LIMIT_DAYS = 365
 
 
 def load_historical_prices(
@@ -24,6 +26,8 @@ def load_historical_prices(
     request_delay: float = 1.1,
     max_history_days: int | None = None,
     max_request_days: int | None = None,
+    coincap_client: CoincapClient | None = None,
+    coincap_request_delay: float | None = None,
 ) -> int:
     if days <= 0:
         return 0
@@ -35,6 +39,8 @@ def load_historical_prices(
         request_delay=request_delay,
         max_history_days=max_history_days,
         max_request_days=max_request_days,
+        coincap_client=coincap_client,
+        coincap_request_delay=coincap_request_delay,
     )
     return result["inserted"]
 
@@ -67,12 +73,17 @@ def _price_exists(session, crypto_id: int, as_of: date) -> bool:
 
 
 def update_crypto_price(
-    session, client: CoinGeckoClient, crypto: Cryptocurrency, vs_currency: str, as_of: date
+    session,
+    client: CoinGeckoClient,
+    crypto: Cryptocurrency,
+    vs_currency: str,
+    as_of: date,
+    coincap_client: CoincapClient | None = None,
 ) -> bool:
     if _price_exists(session, crypto.id, as_of):
         return False
     price_decimal = _fetch_historical_price(
-        client, crypto.coingecko_id, vs_currency, as_of
+        client, crypto.coingecko_id, vs_currency, as_of, coincap_client=coincap_client
     )
     _upsert_price(session, crypto.id, as_of, price_decimal)
     session.commit()
@@ -80,7 +91,11 @@ def update_crypto_price(
 
 
 def update_single_price(
-    crypto_id: int, client: CoinGeckoClient, vs_currency: str, as_of: date | None = None
+    crypto_id: int,
+    client: CoinGeckoClient,
+    vs_currency: str,
+    as_of: date | None = None,
+    coincap_client: CoincapClient | None = None,
 ) -> bool:
     session = get_session()
     today = date.today()
@@ -93,7 +108,14 @@ def update_single_price(
     if not crypto:
         raise ValueError("Crypto not found")
     try:
-        return update_crypto_price(session, client, crypto, vs_currency, as_of)
+        return update_crypto_price(
+            session,
+            client,
+            crypto,
+            vs_currency,
+            as_of,
+            coincap_client=coincap_client,
+        )
     except Exception:
         session.rollback()
         raise
@@ -107,7 +129,11 @@ def _to_timestamp(day: date, end_of_day: bool) -> int:
     return int(dt.timestamp())
 
 
-def _fetch_historical_price(
+def _to_timestamp_ms(day: date, end_of_day: bool) -> int:
+    return _to_timestamp(day, end_of_day) * 1000
+
+
+def _fetch_historical_price_coingecko(
     client: CoinGeckoClient, coingecko_id: str, vs_currency: str, as_of: date
 ) -> Decimal:
     from_ts = _to_timestamp(as_of, end_of_day=False)
@@ -120,6 +146,41 @@ def _fetch_historical_price(
     if price_value is None:
         raise CoinGeckoError("Historical price not found in response")
     return Decimal(str(price_value))
+
+
+def _fetch_historical_price_coincap(
+    client: CoincapClient, asset_id: str, vs_currency: str, as_of: date
+) -> Decimal:
+    if vs_currency.lower() != "usd":
+        raise CoincapError("Coincap only supports USD historical prices")
+    from_ts = _to_timestamp_ms(as_of, end_of_day=False)
+    to_ts = _to_timestamp_ms(as_of, end_of_day=True)
+    payload = client.get_asset_history(asset_id, from_ts, to_ts)
+    data = payload.get("data", [])
+    if not data:
+        raise CoincapError("Historical price not found in response")
+    latest = max(data, key=lambda item: item.get("time", 0))
+    price_value = latest.get("priceUsd")
+    if price_value is None:
+        raise CoincapError("Historical price not found in response")
+    return Decimal(str(price_value))
+
+
+def _fetch_historical_price(
+    client: CoinGeckoClient,
+    coingecko_id: str,
+    vs_currency: str,
+    as_of: date,
+    coincap_client: CoincapClient | None = None,
+) -> Decimal:
+    boundary = date.today() - timedelta(days=COINGECKO_DAILY_LIMIT_DAYS)
+    if as_of < boundary:
+        if not coincap_client:
+            raise CoincapError("Coincap client required for historical prices")
+        return _fetch_historical_price_coincap(
+            coincap_client, coingecko_id, vs_currency, as_of
+        )
+    return _fetch_historical_price_coingecko(client, coingecko_id, vs_currency, as_of)
 
 
 def _compute_missing_ranges(
@@ -154,6 +215,22 @@ def _split_date_range(
     return ranges
 
 
+def _split_ranges_by_boundary(
+    ranges: list[tuple[date, date]], boundary: date
+) -> tuple[list[tuple[date, date]], list[tuple[date, date]]]:
+    historical: list[tuple[date, date]] = []
+    recent: list[tuple[date, date]] = []
+    for range_start, range_end in ranges:
+        if range_end < boundary:
+            historical.append((range_start, range_end))
+        elif range_start >= boundary:
+            recent.append((range_start, range_end))
+        else:
+            historical.append((range_start, boundary - timedelta(days=1)))
+            recent.append((boundary, range_end))
+    return historical, recent
+
+
 def backfill_historical_prices(
     crypto_id: int,
     client: CoinGeckoClient,
@@ -162,6 +239,8 @@ def backfill_historical_prices(
     request_delay: float = 1.1,
     max_history_days: int | None = None,
     max_request_days: int | None = None,
+    coincap_client: CoincapClient | None = None,
+    coincap_request_delay: float | None = None,
 ) -> dict[str, Any]:
     session = get_session()
     end_date = date.today() - timedelta(days=1)
@@ -237,7 +316,39 @@ def backfill_historical_prices(
             _split_date_range(range_start, range_end, max_chunk_days)
         )
 
-    for idx, (range_start, range_end) in enumerate(request_ranges):
+    boundary = date.today() - timedelta(days=COINGECKO_DAILY_LIMIT_DAYS)
+    historical_ranges, recent_ranges = _split_ranges_by_boundary(
+        request_ranges, boundary
+    )
+    if historical_ranges and not coincap_client:
+        raise CoincapError("Coincap client required for historical ranges")
+    if historical_ranges and vs_currency.lower() != "usd":
+        raise CoincapError("Coincap only supports USD historical prices")
+    if coincap_request_delay is None:
+        coincap_request_delay = request_delay
+
+    def persist_prices(by_date: dict[date, Decimal]) -> int:
+        if not by_date:
+            return 0
+        records = [
+            {"crypto_id": crypto.id, "date": day, "price": price}
+            for day, price in by_date.items()
+        ]
+        stmt = insert(Price).values(records)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[Price.crypto_id, Price.date],
+            set_={"price": stmt.excluded.price},
+        )
+        try:
+            session.execute(stmt)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        existing_dates.update(by_date.keys())
+        return len(records)
+
+    for idx, (range_start, range_end) in enumerate(recent_ranges):
         from_ts = _to_timestamp(range_start, end_of_day=False)
         to_ts = _to_timestamp(range_end, end_of_day=True)
         payload = client.get_market_chart_range(
@@ -251,25 +362,7 @@ def backfill_historical_prices(
                 if dt in existing_dates:
                     continue
                 by_date[dt] = Decimal(str(price))
-
-            if by_date:
-                records = [
-                    {"crypto_id": crypto.id, "date": day, "price": price}
-                    for day, price in by_date.items()
-                ]
-                stmt = insert(Price).values(records)
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=[Price.crypto_id, Price.date],
-                    set_={"price": stmt.excluded.price},
-                )
-                try:
-                    session.execute(stmt)
-                    session.commit()
-                except Exception:
-                    session.rollback()
-                    raise
-                inserted_total += len(records)
-                existing_dates.update(by_date.keys())
+            inserted_total += persist_prices(by_date)
 
         requested += 1
         ranges_info.append(
@@ -278,8 +371,41 @@ def backfill_historical_prices(
                 "to": range_end.isoformat(),
             }
         )
-        if idx < len(request_ranges) - 1 and request_delay > 0:
+        if idx < len(recent_ranges) - 1 and request_delay > 0:
             time_module.sleep(request_delay)
+
+    if historical_ranges and coincap_client:
+        for idx, (range_start, range_end) in enumerate(historical_ranges):
+            from_ts = _to_timestamp_ms(range_start, end_of_day=False)
+            to_ts = _to_timestamp_ms(range_end, end_of_day=True)
+            payload = coincap_client.get_asset_history(
+                crypto.coingecko_id, from_ts, to_ts
+            )
+            data = payload.get("data", [])
+            if data:
+                by_date: dict[date, Decimal] = {}
+                for entry in data:
+                    timestamp_ms = entry.get("time")
+                    price = entry.get("priceUsd")
+                    if timestamp_ms is None or price is None:
+                        continue
+                    dt = datetime.fromtimestamp(
+                        timestamp_ms / 1000, tz=timezone.utc
+                    ).date()
+                    if dt in existing_dates:
+                        continue
+                    by_date[dt] = Decimal(str(price))
+                inserted_total += persist_prices(by_date)
+
+            requested += 1
+            ranges_info.append(
+                {
+                    "from": range_start.isoformat(),
+                    "to": range_end.isoformat(),
+                }
+            )
+            if idx < len(historical_ranges) - 1 and coincap_request_delay > 0:
+                time_module.sleep(coincap_request_delay)
 
     return {"inserted": inserted_total, "requested": requested, "ranges": ranges_info}
 

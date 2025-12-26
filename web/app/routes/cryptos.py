@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from ..db import get_session
 from ..models import Cryptocurrency
 from ..services.coingecko import CoinGeckoClient, CoinGeckoError
+from ..services.coincap import CoincapClient
 from ..services.price_updater import load_historical_prices
 
 bp = Blueprint("cryptos", __name__, url_prefix="/cryptos")
@@ -48,6 +49,12 @@ def create_crypto():
         api_key=current_app.config["COINGECKO_API_KEY"],
         api_key_header=current_app.config["COINGECKO_API_KEY_HEADER"],
     )
+    coincap_client = CoincapClient(
+        current_app.config["COINCAP_BASE_URL"],
+        retry_count=current_app.config["COINCAP_RETRY_COUNT"],
+        retry_delay=current_app.config["COINCAP_RETRY_DELAY"],
+        api_key=current_app.config["COINCAP_API_KEY"],
+    )
     try:
         coin = client.get_coin_basic(coingecko_id)
     except CoinGeckoError as exc:
@@ -81,6 +88,7 @@ def create_crypto():
         try:
             vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
             request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
+            coincap_request_delay = current_app.config["COINCAP_REQUEST_DELAY"]
             inserted = load_historical_prices(
                 client,
                 crypto,
@@ -89,6 +97,8 @@ def create_crypto():
                 request_delay=request_delay,
                 max_history_days=max_days,
                 max_request_days=backfill_max_days,
+                coincap_client=coincap_client,
+                coincap_request_delay=coincap_request_delay,
             )
             flash(f"Loaded {inserted} historical prices", "success")
         except Exception as exc:
