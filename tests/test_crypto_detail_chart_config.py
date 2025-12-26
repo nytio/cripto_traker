@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from app.db import get_session
@@ -12,7 +12,7 @@ def test_crypto_detail_includes_prophet_line_data(client, app):
         session.add(crypto)
         session.commit()
         crypto_id = crypto.id
-        cutoff_date = date(2024, 1, 10)
+        cutoff_date = date.today() - timedelta(days=1)
         session.add(Price(crypto_id=crypto.id, date=cutoff_date, price=1))
         session.add(
             ProphetForecast(
