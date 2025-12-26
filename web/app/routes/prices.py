@@ -79,10 +79,10 @@ def backfill_prices(crypto_id: int):
         return _redirect_with_days(crypto_id)
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
-    backfill_max_days = min(365, max_days)
-    if days > backfill_max_days:
-        days = backfill_max_days
-        flash(f"History days limited to {backfill_max_days}", "warning")
+    max_request_days = min(365, max_days)
+    if days > max_days:
+        days = max_days
+        flash(f"History days limited to {max_days}", "warning")
 
     client = CoinGeckoClient(
         current_app.config["COINGECKO_BASE_URL"],
@@ -91,12 +91,15 @@ def backfill_prices(crypto_id: int):
         api_key=current_app.config["COINGECKO_API_KEY"],
         api_key_header=current_app.config["COINGECKO_API_KEY_HEADER"],
     )
-    coincap_client = CoincapClient(
-        current_app.config["COINCAP_BASE_URL"],
-        retry_count=current_app.config["COINCAP_RETRY_COUNT"],
-        retry_delay=current_app.config["COINCAP_RETRY_DELAY"],
-        api_key=current_app.config["COINCAP_API_KEY"],
-    )
+    coincap_base_url = current_app.config["COINCAP_BASE_URL"]
+    coincap_client = None
+    if coincap_base_url:
+        coincap_client = CoincapClient(
+            coincap_base_url,
+            retry_count=current_app.config["COINCAP_RETRY_COUNT"],
+            retry_delay=current_app.config["COINCAP_RETRY_DELAY"],
+            api_key=current_app.config["COINCAP_API_KEY"],
+        )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
     request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
     coincap_request_delay = current_app.config["COINCAP_REQUEST_DELAY"]
@@ -109,7 +112,7 @@ def backfill_prices(crypto_id: int):
             days=days,
             request_delay=request_delay,
             max_history_days=max_days,
-            max_request_days=backfill_max_days,
+            max_request_days=max_request_days,
             coincap_client=coincap_client,
             coincap_request_delay=coincap_request_delay,
         )
