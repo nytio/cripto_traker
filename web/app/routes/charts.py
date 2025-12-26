@@ -33,6 +33,17 @@ from ..services.series import clamp_days, fetch_price_series
 bp = Blueprint("charts", __name__)
 
 
+def _redirect_with_days(crypto_id: int):
+    days_raw = request.form.get("range_days", "").strip()
+    if not days_raw:
+        days_raw = request.args.get("days", "").strip()
+    if days_raw.isdigit():
+        return redirect(
+            url_for("charts.crypto_detail", crypto_id=crypto_id, days=days_raw)
+        )
+    return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+
 @bp.get("/cryptos/<int:crypto_id>")
 def crypto_detail(crypto_id: int):
     session = get_session()
@@ -43,7 +54,10 @@ def crypto_detail(crypto_id: int):
         abort(404)
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
-    days = clamp_days(request.args.get("days", "").strip(), max_days)
+    days_raw = request.args.get("days", "").strip()
+    if not days_raw:
+        days_raw = str(min(365, max_days))
+    days = clamp_days(days_raw, max_days)
 
     start_date = date.today() - timedelta(days=days) if days > 0 else None
     rows = fetch_price_series(session, crypto_id, days)
@@ -103,23 +117,23 @@ def recalculate_prophet(crypto_id: int):
     horizon_days = current_app.config.get("PROPHET_FUTURE_DAYS", 30)
     if horizon_days <= 0:
         flash("Prophet forecast disabled", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
     rows = fetch_price_series(session, crypto_id, 0)
     if len(rows) < 2:
         flash("Not enough price history for Prophet", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     try:
         stored = store_prophet_forecast(session, crypto_id, rows, horizon_days)
     except Exception as exc:
         flash(f"Failed to compute Prophet: {exc}", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     if stored:
         flash(f"Prophet updated: {stored} points", "success")
     else:
         flash("Prophet forecast not available", "error")
-    return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+    return _redirect_with_days(crypto_id)
 
 
 @bp.post("/cryptos/<int:crypto_id>/lstm")
@@ -134,24 +148,24 @@ def recalculate_lstm(crypto_id: int):
     horizon_days = current_app.config.get("RNN_FUTURE_DAYS", 30)
     if horizon_days <= 0:
         flash("LSTM forecast disabled", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     rows = fetch_price_series(session, crypto_id, 0)
     if len(rows) < 5:
         flash("Not enough price history for LSTM", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     try:
         stored = store_lstm_forecast(session, crypto_id, rows, horizon_days)
     except Exception as exc:
         flash(f"Failed to compute LSTM: {exc}", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     if stored:
         flash(f"LSTM updated: {stored} points", "success")
     else:
         flash("LSTM forecast not available", "error")
-    return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+    return _redirect_with_days(crypto_id)
 
 
 @bp.post("/cryptos/<int:crypto_id>/gru")
@@ -166,21 +180,21 @@ def recalculate_gru(crypto_id: int):
     horizon_days = current_app.config.get("RNN_FUTURE_DAYS", 30)
     if horizon_days <= 0:
         flash("GRU forecast disabled", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     rows = fetch_price_series(session, crypto_id, 0)
     if len(rows) < 5:
         flash("Not enough price history for GRU", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     try:
         stored = store_gru_forecast(session, crypto_id, rows, horizon_days)
     except Exception as exc:
         flash(f"Failed to compute GRU: {exc}", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     if stored:
         flash(f"GRU updated: {stored} points", "success")
     else:
         flash("GRU forecast not available", "error")
-    return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+    return _redirect_with_days(crypto_id)

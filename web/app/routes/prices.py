@@ -12,6 +12,15 @@ from ..services.price_updater import (
 bp = Blueprint("prices", __name__, url_prefix="/prices")
 
 
+def _redirect_with_days(crypto_id: int):
+    days_raw = request.form.get("range_days", "").strip()
+    if days_raw.isdigit():
+        return redirect(
+            url_for("charts.crypto_detail", crypto_id=crypto_id, days=days_raw)
+        )
+    return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+
 @bp.post("/update")
 def update_prices():
     client = CoinGeckoClient(
@@ -62,7 +71,7 @@ def backfill_prices(crypto_id: int):
     days = int(days_raw) if days_raw.isdigit() else 0
     if days <= 0:
         flash("History days must be greater than zero", "error")
-        return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+        return _redirect_with_days(crypto_id)
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
     if days > max_days:
@@ -95,4 +104,4 @@ def backfill_prices(crypto_id: int):
     except Exception as exc:
         flash(f"Failed to backfill history: {exc}", "error")
 
-    return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+    return _redirect_with_days(crypto_id)

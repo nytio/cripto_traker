@@ -1,4 +1,65 @@
+const rangeSelect = document.getElementById("days");
 const chartEl = document.getElementById("price-chart");
+const storage =
+  (() => {
+    try {
+      return window.sessionStorage;
+    } catch (error) {
+      return null;
+    }
+  })();
+const cryptoId =
+  (rangeSelect && rangeSelect.dataset.cryptoId) ||
+  (chartEl && chartEl.dataset.cryptoId) ||
+  null;
+const storageKey = cryptoId ? `crypto-detail-toggles:${cryptoId}` : null;
+const readToggleState = () => {
+  if (!storage || !storageKey) {
+    return {};
+  }
+  const raw = storage.getItem(storageKey);
+  if (!raw) {
+    return {};
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return {};
+  }
+};
+const writeToggleState = (state) => {
+  if (!storage || !storageKey) {
+    return;
+  }
+  try {
+    storage.setItem(storageKey, JSON.stringify(state));
+  } catch (error) {
+    // Ignore storage failures (private mode, quota, etc.).
+  }
+};
+const persistToggleState = (key, value) => {
+  if (!storage || !storageKey) {
+    return;
+  }
+  const state = readToggleState();
+  state[key] = value;
+  writeToggleState(state);
+};
+
+if (rangeSelect && rangeSelect.form) {
+  const url = new URL(window.location.href);
+  const savedDays = readToggleState().rangeDays;
+  if (!url.searchParams.has("days") && savedDays) {
+    url.searchParams.set("days", savedDays);
+    window.location.replace(url.toString());
+  } else {
+    persistToggleState("rangeDays", rangeSelect.value);
+    rangeSelect.addEventListener("change", () => {
+      persistToggleState("rangeDays", rangeSelect.value);
+      rangeSelect.form.submit();
+    });
+  }
+}
 
 if (chartEl) {
   const series = JSON.parse(chartEl.dataset.series || "[]");
@@ -441,16 +502,19 @@ if (chartEl) {
     if (sma7Toggle) {
       sma7Toggle.addEventListener("change", (event) => {
         setVisibility([indicatorOffset], event.target.checked);
+        persistToggleState("sma7", event.target.checked);
       });
     }
     if (sma30Toggle) {
       sma30Toggle.addEventListener("change", (event) => {
         setVisibility([indicatorOffset + 1], event.target.checked);
+        persistToggleState("sma30", event.target.checked);
       });
     }
     if (bollingerToggle) {
       bollingerToggle.addEventListener("change", (event) => {
         setVisibility(bollingerTraceIndices, event.target.checked);
+        persistToggleState("bollinger", event.target.checked);
       });
     }
     const prophetHasData = prophetBundle.hasData;
@@ -470,6 +534,7 @@ if (chartEl) {
         if (event.target.checked) {
           refreshAxes();
         }
+        persistToggleState("prophet", event.target.checked);
       });
     }
     if (lstmToggle && !lstmHasData) {
@@ -486,6 +551,7 @@ if (chartEl) {
         if (event.target.checked) {
           refreshAxes();
         }
+        persistToggleState("lstm", event.target.checked);
       });
     }
     if (gruToggle && !gruHasData) {
@@ -502,6 +568,7 @@ if (chartEl) {
         if (event.target.checked) {
           refreshAxes();
         }
+        persistToggleState("gru", event.target.checked);
       });
     }
     if (priceModeToggle) {
@@ -513,7 +580,29 @@ if (chartEl) {
           { visible: useMono ? true : "legendonly" },
           [priceMonoIndex]
         );
+        persistToggleState("priceMode", useMono);
       });
     }
+
+    const savedToggles = readToggleState();
+    const applyToggleState = (toggle, key) => {
+      if (!toggle || toggle.disabled) {
+        return;
+      }
+      const savedValue = savedToggles[key];
+      if (typeof savedValue !== "boolean") {
+        return;
+      }
+      toggle.checked = savedValue;
+      toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+
+    applyToggleState(sma7Toggle, "sma7");
+    applyToggleState(sma30Toggle, "sma30");
+    applyToggleState(bollingerToggle, "bollinger");
+    applyToggleState(prophetToggle, "prophet");
+    applyToggleState(lstmToggle, "lstm");
+    applyToggleState(gruToggle, "gru");
+    applyToggleState(priceModeToggle, "priceMode");
   }
 }

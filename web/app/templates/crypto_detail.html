@@ -4,9 +4,9 @@
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
     <h1 class="h3 mb-0">{{ crypto.name or crypto.coingecko_id }}</h1>
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <form method="get" class="d-flex align-items-center gap-2">
+      <form method="get" class="d-flex align-items-center gap-2" id="range-form">
         <label for="days" class="form-label mb-0">Range</label>
-        <select class="form-select" id="days" name="days">
+        <select class="form-select" id="days" name="days" data-crypto-id="{{ crypto.id }}">
           <option value="0" {% if days == 0 %}selected{% endif %}>All</option>
           <option value="1825" {% if days == 1825 %}selected{% endif %}>5 years</option>
           <option value="365" {% if days == 365 %}selected{% endif %}>1 year</option>
@@ -18,27 +18,42 @@
             </option>
           {% endif %}
         </select>
-        <button type="submit" class="btn btn-outline-primary">Apply</button>
       </form>
-      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#backfill-form" aria-expanded="false" aria-controls="backfill-form">
+      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#backfill-modal">
         Backfill
       </button>
     </div>
   </div>
 
-  <div class="collapse mb-3" id="backfill-form">
-    <form method="post" action="{{ url_for('prices.backfill_prices', crypto_id=crypto.id) }}" class="d-flex flex-wrap align-items-center gap-2" data-loading="1">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="number" class="form-control" name="history_days" min="1" max="{{ max_days }}" placeholder="Backfill days">
-      <button type="submit" class="btn btn-outline-secondary" data-loading-text="Backfilling...">Run backfill</button>
-    </form>
+  <div class="modal fade" id="backfill-modal" tabindex="-1" aria-labelledby="backfill-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="post" action="{{ url_for('prices.backfill_prices', crypto_id=crypto.id) }}" data-loading="1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="range_days" value="{{ days }}">
+          <div class="modal-header">
+            <h5 class="modal-title" id="backfill-modal-label">Backfill history</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <label for="backfill-days" class="form-label">Backfill days</label>
+            <input type="number" class="form-control" id="backfill-days" name="history_days" min="1" max="{{ max_days }}" placeholder="Days to backfill" required>
+            <div class="form-text">Max {{ max_days }} days.</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" data-loading-text="Backfilling...">Run backfill</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
 
   {% if series %}
     <div class="card">
       <div class="card-body">
-        <div id="price-chart" class="chart-container" data-series='{{ series|tojson }}' data-prophet='{{ prophet_forecast|tojson }}' data-prophet-cutoff="{{ prophet_cutoff or '' }}" data-prophet-line="{{ prophet_line_date or '' }}" data-lstm='{{ lstm_forecast|tojson }}' data-lstm-cutoff="{{ lstm_cutoff or '' }}" data-lstm-line="{{ lstm_line_date or '' }}" data-gru='{{ gru_forecast|tojson }}' data-gru-cutoff="{{ gru_cutoff or '' }}" data-gru-line="{{ gru_line_date or '' }}" data-currency="{{ currency }}"></div>
+        <div id="price-chart" class="chart-container" data-crypto-id="{{ crypto.id }}" data-series='{{ series|tojson }}' data-prophet='{{ prophet_forecast|tojson }}' data-prophet-cutoff="{{ prophet_cutoff or '' }}" data-prophet-line="{{ prophet_line_date or '' }}" data-lstm='{{ lstm_forecast|tojson }}' data-lstm-cutoff="{{ lstm_cutoff or '' }}" data-lstm-line="{{ lstm_line_date or '' }}" data-gru='{{ gru_forecast|tojson }}' data-gru-cutoff="{{ gru_cutoff or '' }}" data-gru-line="{{ gru_line_date or '' }}" data-currency="{{ currency }}"></div>
       </div>
     </div>
     <div class="d-flex flex-wrap gap-3 mt-3">
@@ -62,24 +77,27 @@
         <input class="form-check-input" type="checkbox" value="Prophet" id="toggle-prophet">
         <label class="form-check-label" for="toggle-prophet">Prophet</label>
       </div>
-      <form method="post" action="{{ url_for('charts.recalculate_prophet', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1">
+      <form method="post" action="{{ url_for('charts.recalculate_prophet', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="range_days" value="{{ days }}">
         <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Calculando...">Update</button>
       </form>
       <div class="form-check">
         <input class="form-check-input" type="checkbox" value="LSTM" id="toggle-lstm">
         <label class="form-check-label" for="toggle-lstm">LSTM</label>
       </div>
-      <form method="post" action="{{ url_for('charts.recalculate_lstm', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1">
+      <form method="post" action="{{ url_for('charts.recalculate_lstm', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="range_days" value="{{ days }}">
         <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Calculando...">Update</button>
       </form>
       <div class="form-check">
         <input class="form-check-input" type="checkbox" value="GRU" id="toggle-gru">
         <label class="form-check-label" for="toggle-gru">GRU</label>
       </div>
-      <form method="post" action="{{ url_for('charts.recalculate_gru', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1">
+      <form method="post" action="{{ url_for('charts.recalculate_gru', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="range_days" value="{{ days }}">
         <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Calculando...">Update</button>
       </form>
     </div>
