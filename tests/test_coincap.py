@@ -16,8 +16,10 @@ class FakeResponse:
 class FakeRequests:
     def __init__(self, response):
         self._response = response
+        self.last_kwargs = {}
 
     def get(self, *args, **kwargs):
+        self.last_kwargs = kwargs
         return self._response
 
 
@@ -26,7 +28,7 @@ def test_get_asset_history_success(monkeypatch):
     fake_requests = FakeRequests(response)
     monkeypatch.setattr("app.services.coincap.requests", fake_requests)
 
-    client = CoincapClient("https://api.coincap.io/v2")
+    client = CoincapClient("https://rest.coincap.io/v3")
     data = client.get_asset_history("bitcoin", 0, 1)
 
     assert data["data"][0]["priceUsd"] == "123"
@@ -37,7 +39,7 @@ def test_get_asset_history_not_found(monkeypatch):
     fake_requests = FakeRequests(response)
     monkeypatch.setattr("app.services.coincap.requests", fake_requests)
 
-    client = CoincapClient("https://api.coincap.io/v2")
+    client = CoincapClient("https://rest.coincap.io/v3")
     with pytest.raises(CoincapError):
         client.get_asset_history("unknown", 0, 1)
 
@@ -47,6 +49,17 @@ def test_get_asset_history_server_error(monkeypatch):
     fake_requests = FakeRequests(response)
     monkeypatch.setattr("app.services.coincap.requests", fake_requests)
 
-    client = CoincapClient("https://api.coincap.io/v2")
+    client = CoincapClient("https://rest.coincap.io/v3")
     with pytest.raises(CoincapError):
         client.get_asset_history("bitcoin", 0, 1)
+
+
+def test_get_asset_history_includes_api_key(monkeypatch):
+    response = FakeResponse(200, json_data={"data": []})
+    fake_requests = FakeRequests(response)
+    monkeypatch.setattr("app.services.coincap.requests", fake_requests)
+
+    client = CoincapClient("https://rest.coincap.io/v3", api_key="secret")
+    client.get_asset_history("bitcoin", 0, 1)
+
+    assert fake_requests.last_kwargs["params"]["apiKey"] == "secret"

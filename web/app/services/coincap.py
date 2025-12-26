@@ -20,14 +20,15 @@ class CoincapClient:
         self.base_url = base_url.rstrip("/")
         self.retry_count = max(retry_count, 0)
         self.retry_delay = max(retry_delay, 0.0)
+        self.api_key = api_key
         self.headers = {
             "Accept": "application/json",
             "User-Agent": "crypto-tracker/1.0",
         }
-        if api_key:
-            self.headers["Authorization"] = f"Bearer {api_key}"
 
     def _get(self, path: str, params: dict | None = None) -> dict:
+        if self.api_key:
+            params = {**(params or {}), "apiKey": self.api_key}
         url = f"{self.base_url}/{path.lstrip('/')}"
         last_exc: Exception | None = None
         for attempt in range(self.retry_count + 1):
