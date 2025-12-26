@@ -5,13 +5,27 @@ class Config:
     def __init__(self) -> None:
         self.SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-secret")
         self.DATABASE_URL = os.environ.get("DATABASE_URL", "")
-        self.COINGECKO_BASE_URL = os.environ.get(
-            "COINGECKO_BASE_URL", "https://api.coingecko.com/api/v3"
-        )
+        base_url_raw = os.environ.get("COINGECKO_BASE_URL", "").strip()
+        if not base_url_raw:
+            base_url_raw = "https://api.coingecko.com/api/v3"
+        base_url = base_url_raw.split("?", 1)[0].split("#", 1)[0].rstrip("/")
+        self.COINGECKO_BASE_URL = base_url or "https://api.coingecko.com/api/v3"
+        api_key = os.environ.get("COINGECKO_API_KEY", "").strip()
+        self.COINGECKO_API_KEY = api_key
+        api_key_header_raw = os.environ.get("COINGECKO_API_KEY_HEADER", "").strip()
+        api_key_header = api_key_header_raw.lower().replace("_", "-")
+        if api_key_header:
+            self.COINGECKO_API_KEY_HEADER = api_key_header
+        elif "pro-api.coingecko.com" in self.COINGECKO_BASE_URL:
+            self.COINGECKO_API_KEY_HEADER = "x-cg-pro-api-key"
+        else:
+            self.COINGECKO_API_KEY_HEADER = "x-cg-demo-api-key"
         vs_currency = os.environ.get("COINGECKO_VS_CURRENCY", "").strip()
         self.COINGECKO_VS_CURRENCY = (vs_currency or "usd").lower()
         max_days_raw = os.environ.get("MAX_HISTORY_DAYS", "")
-        self.MAX_HISTORY_DAYS = int(max_days_raw) if max_days_raw.isdigit() else 365
+        self.MAX_HISTORY_DAYS = (
+            int(max_days_raw) if max_days_raw.isdigit() else 3650
+        )
         delay_raw = os.environ.get("COINGECKO_REQUEST_DELAY", "1.1").strip()
         try:
             self.COINGECKO_REQUEST_DELAY = float(delay_raw)

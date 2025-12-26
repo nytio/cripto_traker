@@ -27,6 +27,8 @@ def update_prices():
         current_app.config["COINGECKO_BASE_URL"],
         retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
         retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
+        api_key=current_app.config["COINGECKO_API_KEY"],
+        api_key_header=current_app.config["COINGECKO_API_KEY_HEADER"],
     )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
     request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
@@ -49,6 +51,8 @@ def update_price(crypto_id: int):
         current_app.config["COINGECKO_BASE_URL"],
         retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
         retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
+        api_key=current_app.config["COINGECKO_API_KEY"],
+        api_key_header=current_app.config["COINGECKO_API_KEY_HEADER"],
     )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
     as_of = date.today() - timedelta(days=1)
@@ -74,14 +78,17 @@ def backfill_prices(crypto_id: int):
         return _redirect_with_days(crypto_id)
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
-    if days > max_days:
-        days = max_days
-        flash(f"History days limited to {max_days}", "warning")
+    backfill_max_days = min(365, max_days)
+    if days > backfill_max_days:
+        days = backfill_max_days
+        flash(f"History days limited to {backfill_max_days}", "warning")
 
     client = CoinGeckoClient(
         current_app.config["COINGECKO_BASE_URL"],
         retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
         retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
+        api_key=current_app.config["COINGECKO_API_KEY"],
+        api_key_header=current_app.config["COINGECKO_API_KEY_HEADER"],
     )
     vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
     request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
@@ -93,6 +100,8 @@ def backfill_prices(crypto_id: int):
             vs_currency=vs_currency,
             days=days,
             request_delay=request_delay,
+            max_history_days=max_days,
+            max_request_days=backfill_max_days,
         )
         if result["requested"] == 0:
             flash("History already complete for this range", "success")

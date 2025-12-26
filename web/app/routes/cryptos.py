@@ -45,6 +45,8 @@ def create_crypto():
         current_app.config["COINGECKO_BASE_URL"],
         retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
         retry_delay=current_app.config["COINGECKO_RETRY_DELAY"],
+        api_key=current_app.config["COINGECKO_API_KEY"],
+        api_key_header=current_app.config["COINGECKO_API_KEY_HEADER"],
     )
     try:
         coin = client.get_coin_basic(coingecko_id)
@@ -70,6 +72,7 @@ def create_crypto():
         return redirect(url_for("cryptos.new_crypto"))
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
+    backfill_max_days = min(365, max_days)
     if history_days > max_days:
         history_days = max_days
         flash(f"History days limited to {max_days}", "warning")
@@ -79,7 +82,13 @@ def create_crypto():
             vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
             request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
             inserted = load_historical_prices(
-                client, crypto, vs_currency, history_days, request_delay=request_delay
+                client,
+                crypto,
+                vs_currency,
+                history_days,
+                request_delay=request_delay,
+                max_history_days=max_days,
+                max_request_days=backfill_max_days,
             )
             flash(f"Loaded {inserted} historical prices", "success")
         except Exception as exc:

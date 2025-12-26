@@ -10,7 +10,14 @@ class CoinGeckoError(Exception):
 
 
 class CoinGeckoClient:
-    def __init__(self, base_url: str, retry_count: int = 2, retry_delay: float = 1.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        retry_count: int = 2,
+        retry_delay: float = 1.0,
+        api_key: str | None = None,
+        api_key_header: str | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.retry_count = max(retry_count, 0)
         self.retry_delay = max(retry_delay, 0.0)
@@ -18,6 +25,13 @@ class CoinGeckoClient:
             "Accept": "application/json",
             "User-Agent": "crypto-tracker/1.0",
         }
+        if api_key:
+            header = api_key_header or (
+                "x-cg-pro-api-key"
+                if "pro-api.coingecko.com" in self.base_url
+                else "x-cg-demo-api-key"
+            )
+            self.headers[header] = api_key
 
     def _get(self, path: str, params: dict | None = None) -> dict:
         url = f"{self.base_url}/{path.lstrip('/')}"

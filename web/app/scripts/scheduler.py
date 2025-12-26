@@ -15,6 +15,8 @@ def run_update(app, as_of_date) -> None:
             app.config["COINGECKO_BASE_URL"],
             retry_count=app.config["COINGECKO_RETRY_COUNT"],
             retry_delay=app.config["COINGECKO_RETRY_DELAY"],
+            api_key=app.config["COINGECKO_API_KEY"],
+            api_key_header=app.config["COINGECKO_API_KEY_HEADER"],
         )
         vs_currency = app.config["COINGECKO_VS_CURRENCY"]
         request_delay = app.config["COINGECKO_REQUEST_DELAY"]

@@ -37,8 +37,8 @@
           </div>
           <div class="modal-body">
             <label for="backfill-days" class="form-label">Backfill days</label>
-            <input type="number" class="form-control" id="backfill-days" name="history_days" min="1" max="{{ max_days }}" placeholder="Days to backfill" required>
-            <div class="form-text">Max {{ max_days }} days.</div>
+            <input type="number" class="form-control" id="backfill-days" name="history_days" min="1" max="{{ backfill_max_days }}" placeholder="Days to backfill" required>
+            <div class="form-text">Max {{ backfill_max_days }} days per request (up to {{ max_days }} days total).</div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

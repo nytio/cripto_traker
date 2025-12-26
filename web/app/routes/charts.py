@@ -54,6 +54,7 @@ def crypto_detail(crypto_id: int):
         abort(404)
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
+    backfill_max_days = min(365, max_days)
     days_raw = request.args.get("days", "").strip()
     if not days_raw:
         days_raw = str(min(365, max_days))
@@ -102,6 +103,7 @@ def crypto_detail(crypto_id: int):
         currency=current_app.config["COINGECKO_VS_CURRENCY"].upper(),
         days=days,
         max_days=max_days,
+        backfill_max_days=backfill_max_days,
     )
 
 
