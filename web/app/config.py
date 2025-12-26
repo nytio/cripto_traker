@@ -41,14 +41,12 @@ class Config:
         except ValueError:
             self.COINGECKO_RETRY_DELAY = 1.0
         coincap_base_url_raw = os.environ.get("COINCAP_BASE_URL", "").strip()
-        if not coincap_base_url_raw:
-            coincap_base_url_raw = "https://rest.coincap.io/v3"
         coincap_base_url = (
             coincap_base_url_raw.split("?", 1)[0]
             .split("#", 1)[0]
             .rstrip("/")
         )
-        self.COINCAP_BASE_URL = coincap_base_url or "https://rest.coincap.io/v3"
+        self.COINCAP_BASE_URL = coincap_base_url
         self.COINCAP_API_KEY = os.environ.get("COINCAP_API_KEY", "").strip()
         coincap_delay_raw = os.environ.get("COINCAP_REQUEST_DELAY", "1.1").strip()
         try:
