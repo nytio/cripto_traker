@@ -120,7 +120,10 @@ def recalculate_prophet(crypto_id: int):
     if horizon_days <= 0:
         flash("Prophet forecast disabled", "error")
         return _redirect_with_days(crypto_id)
-    rows = fetch_price_series(session, crypto_id, 0)
+    max_days = current_app.config["MAX_HISTORY_DAYS"]
+    prophet_days_raw = request.form.get("prophet_days", "").strip()
+    prophet_days = clamp_days(prophet_days_raw, max_days)
+    rows = fetch_price_series(session, crypto_id, prophet_days)
     if len(rows) < 2:
         flash("Not enough price history for Prophet", "error")
         return _redirect_with_days(crypto_id)
