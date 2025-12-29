@@ -24,10 +24,14 @@ def run_update(app, as_of_date) -> None:
             client, vs_currency=vs_currency, as_of=as_of_date, request_delay=request_delay
         )
         updated = result.get("updated", 0)
+        inserted = result.get("inserted", 0)
         errors = result.get("errors", [])
         timestamp = datetime.utcnow().isoformat()
         print(
-            f"[{timestamp}] Updated {updated} cryptos for {as_of_date}; errors: {len(errors)}",
+            (
+                f"[{timestamp}] Updated {updated} cryptos through {as_of_date}; "
+                f"prices inserted: {inserted}; errors: {len(errors)}"
+            ),
             flush=True,
         )
 

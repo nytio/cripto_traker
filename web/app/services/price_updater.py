@@ -148,6 +148,30 @@ def _fetch_historical_price(
     return _fetch_historical_price_coingecko(client, coingecko_id, vs_currency, as_of)
 
 
+def _fetch_daily_prices_range_coingecko(
+    client: CoinGeckoClient,
+    coingecko_id: str,
+    vs_currency: str,
+    start_date: date,
+    end_date: date,
+) -> dict[date, Decimal]:
+    from_ts = _to_timestamp(start_date, end_of_day=False)
+    to_ts = _to_timestamp(end_date, end_of_day=True)
+    payload = client.get_market_chart_range(coingecko_id, vs_currency, from_ts, to_ts)
+    prices = payload.get("prices", [])
+    if not prices:
+        return {}
+    by_date: dict[date, Decimal] = {}
+    for timestamp_ms, price in sorted(prices, key=lambda item: item[0]):
+        if price is None:
+            continue
+        dt = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).date()
+        if dt < start_date or dt > end_date:
+            continue
+        by_date[dt] = Decimal(str(price))
+    return by_date
+
+
 def _compute_missing_ranges(
     start_date: date, end_date: date, existing_dates: set[date]
 ) -> list[tuple[date, date]]:
@@ -392,33 +416,66 @@ def update_daily_prices(
 ) -> dict[str, Any]:
     session = get_session()
     today = date.today()
-    as_of = as_of or today
-    if as_of >= today:
-        as_of = today - timedelta(days=1)
+    end_date = as_of or today
+    if end_date >= today:
+        end_date = today - timedelta(days=1)
 
     cryptos = session.execute(select(Cryptocurrency)).scalars().all()
     if not cryptos:
-        return {"updated": 0, "skipped": 0, "errors": []}
+        return {"updated": 0, "skipped": 0, "errors": [], "inserted": 0}
     updated = 0
     skipped = 0
+    inserted_total = 0
     errors: list[dict[str, str]] = []
 
     for idx, crypto in enumerate(cryptos):
-        should_request = not _price_exists(session, crypto.id, as_of)
-        if not should_request:
+        latest_date = session.execute(
+            select(func.max(Price.date)).where(Price.crypto_id == crypto.id)
+        ).scalar_one_or_none()
+        if latest_date:
+            range_start = latest_date + timedelta(days=1)
+        else:
+            range_start = end_date
+        if range_start > end_date:
             skipped += 1
             continue
+        missing_days = (end_date - range_start).days + 1
+        if missing_days > COINGECKO_DAILY_LIMIT_DAYS:
+            errors.append(
+                {
+                    "crypto_id": str(crypto.id),
+                    "error": (
+                        f"Missing range {missing_days} days exceeds "
+                        f"{COINGECKO_DAILY_LIMIT_DAYS} day limit"
+                    ),
+                }
+            )
+            continue
         try:
-            did_update = update_crypto_price(session, client, crypto, vs_currency, as_of)
-            if did_update:
-                updated += 1
-            else:
+            by_date = _fetch_daily_prices_range_coingecko(
+                client, crypto.coingecko_id, vs_currency, range_start, end_date
+            )
+            if not by_date:
                 skipped += 1
+                continue
+            records = [
+                Price(crypto_id=crypto.id, date=day, price=price)
+                for day, price in sorted(by_date.items())
+            ]
+            session.add_all(records)
+            session.commit()
+            inserted_total += len(records)
+            updated += 1
         except Exception as exc:
             session.rollback()
             errors.append({"crypto_id": str(crypto.id), "error": str(exc)})
         finally:
-            if should_request and request_delay > 0 and idx < len(cryptos) - 1:
+            if request_delay > 0 and idx < len(cryptos) - 1:
                 time_module.sleep(request_delay)
 
-    return {"updated": updated, "skipped": skipped, "errors": errors}
+    return {
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors,
+        "inserted": inserted_total,
+    }

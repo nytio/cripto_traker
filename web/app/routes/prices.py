@@ -38,9 +38,15 @@ def update_prices():
         client, vs_currency=vs_currency, as_of=as_of, request_delay=request_delay
     )
     if result["updated"]:
-        flash(f"Prices updated for {as_of}: {result['updated']}", "success")
+        flash(
+            (
+                f"Prices updated through {as_of}: "
+                f"{result['inserted']} prices across {result['updated']} cryptos"
+            ),
+            "success",
+        )
     if result["skipped"]:
-        flash(f"Prices already stored for {as_of}: {result['skipped']}", "info")
+        flash(f"No new prices needed through {as_of}: {result['skipped']}", "info")
     if result["errors"]:
         flash(f"Errors updating prices: {len(result['errors'])}", "error")
     return redirect(url_for("dashboard.index"))
