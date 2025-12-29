@@ -288,7 +288,7 @@ def backfill_historical_prices(
             _split_date_range(range_start, range_end, max_chunk_days)
         )
 
-    boundary = end_date - timedelta(days=COINGECKO_DAILY_LIMIT_DAYS - 1)
+    boundary = date.today() - timedelta(days=COINGECKO_DAILY_LIMIT_DAYS)
     historical_ranges, recent_ranges = _split_ranges_by_boundary(
         request_ranges, boundary
     )
