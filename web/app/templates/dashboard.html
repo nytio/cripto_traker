@@ -39,10 +39,6 @@
                   <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('charts.crypto_detail', crypto_id=row.crypto.id) }}">
                     View
                   </a>
-                  <form method="post" action="{{ url_for('prices.update_price', crypto_id=row.crypto.id) }}" class="d-inline" data-loading="1">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-sm btn-outline-primary" data-loading-text="Updating...">Update</button>
-                  </form>
                 </td>
               </tr>
             {% endfor %}
