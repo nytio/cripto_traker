@@ -1,7 +1,9 @@
 from datetime import date, timedelta
 
-from flask import Blueprint, current_app, flash, redirect, request, url_for
+from flask import Blueprint, current_app, flash, g, redirect, request, url_for
+from sqlalchemy import select
 
+from ..auth_utils import require_user_crypto
 from ..services.coingecko import CoinGeckoClient
 from ..services.coincap import CoincapClient
 from ..services.price_updater import (
@@ -9,6 +11,8 @@ from ..services.price_updater import (
     update_daily_prices,
     update_single_price,
 )
+from ..db import get_session
+from ..models import UserCrypto
 
 bp = Blueprint("prices", __name__, url_prefix="/prices")
 
@@ -24,6 +28,17 @@ def _redirect_with_days(crypto_id: int):
 
 @bp.post("/update")
 def update_prices():
+    session = get_session()
+    crypto_ids = (
+        session.execute(
+            select(UserCrypto.crypto_id).where(UserCrypto.user_id == g.user.id)
+        )
+        .scalars()
+        .all()
+    )
+    if not crypto_ids:
+        flash("No cryptos in your dashboard to update", "info")
+        return redirect(url_for("dashboard.index"))
     client = CoinGeckoClient(
         current_app.config["COINGECKO_BASE_URL"],
         retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
@@ -35,7 +50,11 @@ def update_prices():
     request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
     as_of = date.today() - timedelta(days=1)
     result = update_daily_prices(
-        client, vs_currency=vs_currency, as_of=as_of, request_delay=request_delay
+        client,
+        vs_currency=vs_currency,
+        as_of=as_of,
+        request_delay=request_delay,
+        crypto_ids=crypto_ids,
     )
     if result["updated"]:
         flash(
@@ -54,6 +73,10 @@ def update_prices():
 
 @bp.post("/update/<int:crypto_id>")
 def update_price(crypto_id: int):
+    session = get_session()
+    if not require_user_crypto(session, g.user.id, crypto_id):
+        flash("Crypto not in your dashboard", "error")
+        return redirect(url_for("dashboard.index"))
     client = CoinGeckoClient(
         current_app.config["COINGECKO_BASE_URL"],
         retry_count=current_app.config["COINGECKO_RETRY_COUNT"],
@@ -78,6 +101,10 @@ def update_price(crypto_id: int):
 
 @bp.post("/backfill/<int:crypto_id>")
 def backfill_prices(crypto_id: int):
+    session = get_session()
+    if not require_user_crypto(session, g.user.id, crypto_id):
+        flash("Crypto not in your dashboard", "error")
+        return redirect(url_for("dashboard.index"))
     days_raw = request.form.get("history_days", "").strip()
     days = int(days_raw) if days_raw.isdigit() else 0
     if days <= 0:

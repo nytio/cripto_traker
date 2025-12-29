@@ -2,16 +2,17 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from app.db import get_session
-from app.models import Cryptocurrency, Price, ProphetForecast
+from app.models import Cryptocurrency, Price, ProphetForecast, UserCrypto
 
 
-def test_crypto_detail_includes_prophet_line_data(client, app):
+def test_crypto_detail_includes_prophet_line_data(auth_client, app, user):
     with app.app_context():
         session = get_session()
         crypto = Cryptocurrency(coingecko_id="btc", name="Bitcoin", symbol="btc")
         session.add(crypto)
         session.commit()
         crypto_id = crypto.id
+        session.add(UserCrypto(user_id=user.id, crypto_id=crypto.id))
         cutoff_date = date.today() - timedelta(days=1)
         session.add(Price(crypto_id=crypto.id, date=cutoff_date, price=1))
         session.add(
@@ -27,7 +28,7 @@ def test_crypto_detail_includes_prophet_line_data(client, app):
         )
         session.commit()
 
-    response = client.get(f"/cryptos/{crypto_id}")
+    response = auth_client.get(f"/cryptos/{crypto_id}")
     assert response.status_code == 200
     expected_line = cutoff_date.isoformat()
     payload = response.get_data(as_text=True)
@@ -35,7 +36,7 @@ def test_crypto_detail_includes_prophet_line_data(client, app):
     assert f'data-prophet-line="{expected_line}"' in payload
 
 
-def test_crypto_detail_defaults_to_one_year_range(client, app):
+def test_crypto_detail_defaults_to_one_year_range(auth_client, app, user):
     with app.app_context():
         session = get_session()
         crypto = Cryptocurrency(
@@ -44,8 +45,10 @@ def test_crypto_detail_defaults_to_one_year_range(client, app):
         session.add(crypto)
         session.commit()
         crypto_id = crypto.id
+        session.add(UserCrypto(user_id=user.id, crypto_id=crypto.id))
+        session.commit()
 
-    response = client.get(f"/cryptos/{crypto_id}")
+    response = auth_client.get(f"/cryptos/{crypto_id}")
     assert response.status_code == 200
     payload = response.get_data(as_text=True)
     expected_days = min(365, app.config["MAX_HISTORY_DAYS"])

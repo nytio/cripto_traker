@@ -1,6 +1,7 @@
-from flask import Flask
+from flask import Flask, g
 from flask_wtf.csrf import CSRFProtect
 
+from .auth_utils import load_current_user, require_login
 from .config import Config
 from .db import init_db
 from .routes import api, auth, charts, cryptos, dashboard, prices
@@ -14,6 +15,18 @@ def create_app() -> Flask:
 
     csrf.init_app(app)
     init_db(app)
+
+    @app.before_request
+    def load_user():
+        load_current_user()
+
+    @app.before_request
+    def enforce_login():
+        return require_login()
+
+    @app.context_processor
+    def inject_user():
+        return {"current_user": getattr(g, "user", None)}
 
     @app.after_request
     def set_security_headers(response):

@@ -5,6 +5,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    g,
     redirect,
     render_template,
     request,
@@ -12,6 +13,7 @@ from flask import (
 )
 from sqlalchemy import select
 
+from ..auth_utils import require_user_crypto
 from ..db import get_session
 from ..models import Cryptocurrency
 from ..services.analytics import compute_indicators
@@ -47,6 +49,8 @@ def _redirect_with_days(crypto_id: int):
 @bp.get("/cryptos/<int:crypto_id>")
 def crypto_detail(crypto_id: int):
     session = get_session()
+    if not require_user_crypto(session, g.user.id, crypto_id):
+        abort(404)
     crypto = session.execute(
         select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
     ).scalar_one_or_none()
@@ -110,6 +114,8 @@ def crypto_detail(crypto_id: int):
 @bp.post("/cryptos/<int:crypto_id>/prophet")
 def recalculate_prophet(crypto_id: int):
     session = get_session()
+    if not require_user_crypto(session, g.user.id, crypto_id):
+        abort(404)
     crypto = session.execute(
         select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
     ).scalar_one_or_none()
@@ -144,6 +150,8 @@ def recalculate_prophet(crypto_id: int):
 @bp.post("/cryptos/<int:crypto_id>/lstm")
 def recalculate_lstm(crypto_id: int):
     session = get_session()
+    if not require_user_crypto(session, g.user.id, crypto_id):
+        abort(404)
     crypto = session.execute(
         select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
     ).scalar_one_or_none()
@@ -176,6 +184,8 @@ def recalculate_lstm(crypto_id: int):
 @bp.post("/cryptos/<int:crypto_id>/gru")
 def recalculate_gru(crypto_id: int):
     session = get_session()
+    if not require_user_crypto(session, g.user.id, crypto_id):
+        abort(404)
     crypto = session.execute(
         select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
     ).scalar_one_or_none()

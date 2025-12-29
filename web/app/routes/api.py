@@ -1,8 +1,9 @@
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 from sqlalchemy import and_, func, select
 
+from ..auth_utils import require_user_crypto
 from ..db import get_session
-from ..models import Cryptocurrency, Price
+from ..models import Cryptocurrency, Price, UserCrypto
 from ..services.analytics import compute_indicators
 from ..services.series import clamp_days, fetch_price_series
 
@@ -24,6 +25,7 @@ def list_cryptos():
     )
     stmt = (
         select(Cryptocurrency, Price)
+        .join(UserCrypto, UserCrypto.crypto_id == Cryptocurrency.id)
         .outerjoin(latest, latest.c.crypto_id == Cryptocurrency.id)
         .outerjoin(
             Price,
@@ -32,6 +34,7 @@ def list_cryptos():
                 Price.date == latest.c.max_date,
             ),
         )
+        .where(UserCrypto.user_id == g.user.id)
         .order_by(Cryptocurrency.name)
     )
     rows = session.execute(stmt).all()
@@ -53,6 +56,8 @@ def list_cryptos():
 @bp.get("/cryptos/<int:crypto_id>/prices")
 def prices(crypto_id: int):
     session = get_session()
+    if not require_user_crypto(session, g.user.id, crypto_id):
+        return jsonify({"error": "not found"}), 404
     prices = (
         session.execute(
             select(Price)
@@ -72,6 +77,8 @@ def prices(crypto_id: int):
 @bp.get("/cryptos/<int:crypto_id>/series")
 def series(crypto_id: int):
     session = get_session()
+    if not require_user_crypto(session, g.user.id, crypto_id):
+        return jsonify({"error": "not found"}), 404
     crypto = session.execute(
         select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
     ).scalar_one_or_none()

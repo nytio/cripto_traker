@@ -19,7 +19,7 @@
               <th>Symbol</th>
               <th>Latest price ({{ currency }})</th>
               <th>Date</th>
-              <th></th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -39,6 +39,12 @@
                   <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('charts.crypto_detail', crypto_id=row.crypto.id) }}">
                     View
                   </a>
+                  <form method="post" action="{{ url_for('cryptos.remove_crypto', crypto_id=row.crypto.id) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                      Remove
+                    </button>
+                  </form>
                 </td>
               </tr>
             {% endfor %}

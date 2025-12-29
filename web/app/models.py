@@ -35,6 +35,27 @@ class Cryptocurrency(Base):
     gru_forecasts = relationship(
         "GruForecast", back_populates="crypto", cascade="all, delete-orphan"
     )
+    user_cryptos = relationship(
+        "UserCrypto", back_populates="crypto", cascade="all, delete-orphan"
+    )
+
+
+class UserCrypto(Base):
+    __tablename__ = "user_cryptos"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    crypto_id = Column(Integer, ForeignKey("cryptocurrencies.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="user_cryptos")
+    crypto = relationship("Cryptocurrency", back_populates="user_cryptos")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "crypto_id", name="uq_user_crypto"),
+        Index("ix_user_cryptos_user_id", "user_id"),
+        Index("ix_user_cryptos_crypto_id", "crypto_id"),
+    )
 
 
 class Price(Base):
@@ -125,3 +146,6 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, nullable=False, server_default="true")
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    user_cryptos = relationship(
+        "UserCrypto", back_populates="user", cascade="all, delete-orphan"
+    )

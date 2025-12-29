@@ -1,9 +1,20 @@
 import re
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    g,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from sqlalchemy import select
 
+from ..auth_utils import user_crypto_exists
 from ..db import get_session
-from ..models import Cryptocurrency
+from ..models import Cryptocurrency, UserCrypto
 from ..services.coingecko import CoinGeckoClient, CoinGeckoError
 from ..services.price_updater import load_historical_prices
 
@@ -14,18 +25,16 @@ COINGECKO_ID_RE = re.compile(r"^[a-z0-9-]{2,50}$")
 
 @bp.get("/new")
 def new_crypto():
-    max_days = current_app.config["MAX_HISTORY_DAYS"]
-    backfill_max_days = min(365, max_days)
-    return render_template(
-        "cryptos_new.html", max_history_days=backfill_max_days
-    )
+    session = get_session()
+    existing_cryptos = session.execute(
+        select(Cryptocurrency).order_by(Cryptocurrency.name)
+    ).scalars()
+    return render_template("cryptos_new.html", existing_cryptos=existing_cryptos)
 
 
 @bp.post("")
 def create_crypto():
     coingecko_id = request.form.get("coingecko_id", "").strip()
-    history_days_raw = request.form.get("history_days", "").strip()
-    history_days = int(history_days_raw) if history_days_raw.isdigit() else 0
     if not coingecko_id:
         flash("coingecko_id is required", "error")
         return redirect(url_for("cryptos.new_crypto"))
@@ -40,8 +49,18 @@ def create_crypto():
         .first()
     )
     if existing:
-        flash("Crypto already exists", "error")
-        return redirect(url_for("cryptos.new_crypto"))
+        if user_crypto_exists(session, g.user.id, existing.id):
+            flash("Crypto already in your dashboard", "info")
+            return redirect(url_for("dashboard.index"))
+        try:
+            session.add(UserCrypto(user_id=g.user.id, crypto_id=existing.id))
+            session.commit()
+        except Exception:
+            session.rollback()
+            flash("Failed to add crypto to dashboard", "error")
+            return redirect(url_for("cryptos.new_crypto"))
+        flash("Crypto added to dashboard", "success")
+        return redirect(url_for("dashboard.index"))
 
     client = CoinGeckoClient(
         current_app.config["COINGECKO_BASE_URL"],
@@ -67,6 +86,8 @@ def create_crypto():
     )
     try:
         session.add(crypto)
+        session.flush()
+        session.add(UserCrypto(user_id=g.user.id, crypto_id=crypto.id))
         session.commit()
     except Exception:
         session.rollback()
@@ -75,29 +96,39 @@ def create_crypto():
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
     backfill_max_days = min(365, max_days)
-    if history_days > backfill_max_days:
-        history_days = backfill_max_days
-        flash(
-            f"History days limited to {backfill_max_days} (use Backfill for more than 1 year)",
-            "warning",
+    history_days = backfill_max_days
+    try:
+        vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
+        request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
+        inserted = load_historical_prices(
+            client,
+            crypto,
+            vs_currency,
+            history_days,
+            request_delay=request_delay,
+            max_history_days=max_days,
+            max_request_days=backfill_max_days,
         )
-
-    if history_days > 0:
-        try:
-            vs_currency = current_app.config["COINGECKO_VS_CURRENCY"]
-            request_delay = current_app.config["COINGECKO_REQUEST_DELAY"]
-            inserted = load_historical_prices(
-                client,
-                crypto,
-                vs_currency,
-                history_days,
-                request_delay=request_delay,
-                max_history_days=max_days,
-                max_request_days=backfill_max_days,
-            )
-            flash(f"Loaded {inserted} historical prices", "success")
-        except Exception as exc:
-            flash(f"Failed to load history: {exc}", "error")
+        flash(f"Loaded {inserted} historical prices", "success")
+    except Exception as exc:
+        flash(f"Failed to load history: {exc}", "error")
 
     flash("Crypto added", "success")
+    return redirect(url_for("dashboard.index"))
+
+
+@bp.post("/<int:crypto_id>/remove")
+def remove_crypto(crypto_id: int):
+    session = get_session()
+    association = (
+        session.query(UserCrypto)
+        .filter(UserCrypto.user_id == g.user.id, UserCrypto.crypto_id == crypto_id)
+        .first()
+    )
+    if not association:
+        flash("Crypto not in your dashboard", "error")
+        return redirect(url_for("dashboard.index"))
+    session.delete(association)
+    session.commit()
+    flash("Crypto removed from dashboard", "success")
     return redirect(url_for("dashboard.index"))

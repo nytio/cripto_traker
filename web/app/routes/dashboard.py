@@ -1,8 +1,8 @@
-from flask import Blueprint, current_app, render_template
+from flask import Blueprint, current_app, g, render_template
 from sqlalchemy import select
 
 from ..db import get_session
-from ..models import Cryptocurrency, Price
+from ..models import Cryptocurrency, Price, UserCrypto
 
 bp = Blueprint("dashboard", __name__)
 
@@ -10,7 +10,16 @@ bp = Blueprint("dashboard", __name__)
 @bp.get("/")
 def index():
     session = get_session()
-    cryptos = session.execute(select(Cryptocurrency).order_by(Cryptocurrency.name)).scalars()
+    cryptos = (
+        session.execute(
+            select(Cryptocurrency)
+            .join(UserCrypto, UserCrypto.crypto_id == Cryptocurrency.id)
+            .where(UserCrypto.user_id == g.user.id)
+            .order_by(Cryptocurrency.name)
+        )
+        .scalars()
+        .all()
+    )
     rows = []
     for crypto in cryptos:
         latest_price = (

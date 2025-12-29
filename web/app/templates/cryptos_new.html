@@ -6,13 +6,17 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="mb-3">
       <label for="coingecko_id" class="form-label">CoinGecko ID</label>
-      <input type="text" class="form-control" id="coingecko_id" name="coingecko_id" placeholder="bitcoin" pattern="[a-z0-9-]{2,50}" required>
-      <div class="form-text">Use the CoinGecko ID (e.g., bitcoin, ethereum).</div>
-    </div>
-    <div class="mb-3">
-      <label for="history_days" class="form-label">Load history (days)</label>
-      <input type="number" class="form-control" id="history_days" name="history_days" min="0" max="{{ max_history_days }}" placeholder="0">
-      <div class="form-text">Optional: load historical prices on creation (max {{ max_history_days }}).</div>
+      <input type="text" class="form-control" id="coingecko_id" name="coingecko_id" placeholder="bitcoin" pattern="[a-z0-9-]{2,50}" list="coingecko-list" required>
+      <datalist id="coingecko-list">
+        {% for crypto in existing_cryptos %}
+          <option value="{{ crypto.coingecko_id }}">
+            {{ crypto.name or crypto.coingecko_id }}{% if crypto.symbol %} ({{ crypto.symbol|upper }}){% endif %}
+          </option>
+        {% endfor %}
+      </datalist>
+      <div class="form-text">
+        Pick an existing crypto or enter a new CoinGecko ID. New IDs load 365 days of history automatically.
+      </div>
     </div>
     <button type="submit" class="btn btn-success">Save</button>
     <a class="btn btn-secondary" href="{{ url_for('dashboard.index') }}">Cancel</a>

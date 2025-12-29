@@ -27,10 +27,38 @@ def app(tmp_path, monkeypatch):
     from app import create_app
 
     app = create_app()
-    app.config.update(TESTING=True)
+    app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
     return app
 
 
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture()
+def user(app):
+    from werkzeug.security import generate_password_hash
+
+    from app.db import get_session
+    from app.models import User
+
+    with app.app_context():
+        session = get_session()
+        user = User(
+            email="user@example.com",
+            password_hash=generate_password_hash("Password123!"),
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+
+
+@pytest.fixture()
+def auth_client(client, user):
+    client.post(
+        "/login",
+        data={"email": user.email, "password": "Password123!"},
+    )
+    return client

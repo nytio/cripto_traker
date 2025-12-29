@@ -413,6 +413,7 @@ def update_daily_prices(
     vs_currency: str,
     as_of: date | None = None,
     request_delay: float = 0.0,
+    crypto_ids: list[int] | None = None,
 ) -> dict[str, Any]:
     session = get_session()
     today = date.today()
@@ -420,7 +421,18 @@ def update_daily_prices(
     if end_date >= today:
         end_date = today - timedelta(days=1)
 
-    cryptos = session.execute(select(Cryptocurrency)).scalars().all()
+    if crypto_ids is None:
+        cryptos = session.execute(select(Cryptocurrency)).scalars().all()
+    elif not crypto_ids:
+        cryptos = []
+    else:
+        cryptos = (
+            session.execute(
+                select(Cryptocurrency).where(Cryptocurrency.id.in_(crypto_ids))
+            )
+            .scalars()
+            .all()
+        )
     if not cryptos:
         return {"updated": 0, "skipped": 0, "errors": [], "inserted": 0}
     updated = 0
