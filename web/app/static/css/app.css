@@ -327,6 +327,12 @@ a:hover {
   align-items: center;
 }
 
+.ct-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
 .ct-chip {
   position: relative;
 }
@@ -357,6 +363,11 @@ a:hover {
     color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.ct-toolbar-group .ct-chip .form-check-label {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 .ct-chip .form-check-input:checked + .form-check-label {
   background: rgba(10, 132, 255, 0.12);
   border-color: rgba(10, 132, 255, 0.2);
@@ -365,6 +376,24 @@ a:hover {
 
 .ct-chip .form-check-input:focus-visible + .form-check-label {
   box-shadow: 0 0 0 0.2rem rgba(10, 132, 255, 0.2);
+}
+
+.ct-toolbar-form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.ct-toolbar-group .ct-toolbar-action {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+}
+
+.ct-toolbar-group .ct-toolbar-action:hover,
+.ct-toolbar-group .ct-toolbar-action:focus {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(10, 132, 255, 0.2);
 }
 
 .ct-toolbar-action {

@@ -129,31 +129,37 @@
               <input class="form-check-input" type="checkbox" value="Bollinger" id="toggle-bollinger">
               <label class="form-check-label" for="toggle-bollinger">Bollinger</label>
             </div>
-            <div class="form-check ct-chip">
-              <input class="form-check-input" type="checkbox" value="Prophet" id="toggle-prophet">
-              <label class="form-check-label" for="toggle-prophet">Prophet</label>
+            <div class="ct-toolbar-group">
+              <div class="form-check ct-chip">
+                <input class="form-check-input" type="checkbox" value="Prophet" id="toggle-prophet">
+                <label class="form-check-label" for="toggle-prophet">Prophet</label>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary ct-toolbar-action" type="button" data-bs-toggle="modal" data-bs-target="#prophet-modal">
+                Update
+              </button>
             </div>
-            <button class="btn btn-sm btn-outline-secondary ct-toolbar-action" type="button" data-bs-toggle="modal" data-bs-target="#prophet-modal">
-              Update
-            </button>
-            <div class="form-check ct-chip">
-              <input class="form-check-input" type="checkbox" value="LSTM" id="toggle-lstm">
-              <label class="form-check-label" for="toggle-lstm">LSTM</label>
+            <div class="ct-toolbar-group">
+              <div class="form-check ct-chip">
+                <input class="form-check-input" type="checkbox" value="LSTM" id="toggle-lstm">
+                <label class="form-check-label" for="toggle-lstm">LSTM</label>
+              </div>
+              <form method="post" action="{{ url_for('charts.recalculate_lstm', crypto_id=crypto.id) }}" class="ct-toolbar-form" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="range_days" value="{{ days }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-action" data-loading-text="Calculando...">Update</button>
+              </form>
             </div>
-            <form method="post" action="{{ url_for('charts.recalculate_lstm', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="range_days" value="{{ days }}">
-              <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-action" data-loading-text="Calculando...">Update</button>
-            </form>
-            <div class="form-check ct-chip">
-              <input class="form-check-input" type="checkbox" value="GRU" id="toggle-gru">
-              <label class="form-check-label" for="toggle-gru">GRU</label>
+            <div class="ct-toolbar-group">
+              <div class="form-check ct-chip">
+                <input class="form-check-input" type="checkbox" value="GRU" id="toggle-gru">
+                <label class="form-check-label" for="toggle-gru">GRU</label>
+              </div>
+              <form method="post" action="{{ url_for('charts.recalculate_gru', crypto_id=crypto.id) }}" class="ct-toolbar-form" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="range_days" value="{{ days }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-action" data-loading-text="Calculando...">Update</button>
+              </form>
             </div>
-            <form method="post" action="{{ url_for('charts.recalculate_gru', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="range_days" value="{{ days }}">
-              <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-action" data-loading-text="Calculando...">Update</button>
-            </form>
             <form method="get" class="d-flex align-items-center gap-2 ms-auto" id="range-form">
               <label for="days" class="form-label mb-0 text-muted small">Range</label>
               <select class="form-select form-select-sm" id="days" name="days" data-crypto-id="{{ crypto.id }}">
