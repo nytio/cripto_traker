@@ -211,4 +211,28 @@ document.addEventListener("DOMContentLoaded", () => {
     input.addEventListener("input", filterRows);
     filterRows();
   });
+
+  const navbar = document.querySelector(".ct-navbar");
+  if (navbar) {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+    const updateNavbar = () => {
+      const currentScrollY = window.scrollY;
+      const isScrollingDown = currentScrollY > lastScrollY;
+      if (currentScrollY <= 8 || !isScrollingDown) {
+        navbar.classList.remove("ct-navbar-hidden");
+      } else if (currentScrollY > 64) {
+        navbar.classList.add("ct-navbar-hidden");
+      }
+      lastScrollY = currentScrollY;
+      ticking = false;
+    };
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateNavbar);
+        ticking = true;
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+  }
 });

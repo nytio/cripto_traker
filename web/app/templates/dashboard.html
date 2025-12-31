@@ -13,24 +13,25 @@
   {% endif %}
   {% set price_prefix = '$' if currency == 'USD' else '' %}
 
-  <div class="card shadow-sm">
-    <div class="card-header bg-transparent d-flex flex-wrap align-items-center justify-content-between gap-3">
-      <div>
-        <h1 class="h5 fw-semibold mb-1">Dashboard</h1>
-        <div class="text-muted">Portfolio overview</div>
-      </div>
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <form method="post" action="{{ url_for('prices.update_prices') }}" data-loading="1">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-sm btn-primary" data-loading-text="Updating..." data-loading-spinner="1">
-            Update prices
-          </button>
-        </form>
-        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('cryptos.new_crypto') }}">
-          Add crypto
-        </a>
-      </div>
+  <div class="d-flex flex-wrap align-items-center gap-3 mb-3 py-2">
+    <div class="d-flex flex-column gap-1">
+      <h1 class="h5 fw-semibold mb-0">Dashboard</h1>
+      <div class="text-muted small">Portfolio overview</div>
     </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+      <form method="post" action="{{ url_for('prices.update_prices') }}" data-loading="1">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-sm btn-primary" data-loading-text="Updating..." data-loading-spinner="1">
+          Update prices
+        </button>
+      </form>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('cryptos.new_crypto') }}">
+        Add crypto
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
     <div class="card-body p-0">
       {% if rows %}
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 p-3">
@@ -54,7 +55,6 @@
                 <th>Name</th>
                 <th>Symbol</th>
                 <th class="text-end">Latest price <span class="ct-meta">({{ currency }})</span></th>
-                <th>Date</th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
@@ -76,15 +76,12 @@
                   <td class="text-end">
                     {% if row.latest %}
                       <div class="fw-semibold ct-price">{{ price_prefix }}{{ "{:,.2f}".format(row.latest.price) }}</div>
-                      <div class="ct-meta ct-price" title="{{ price_prefix }}{{ "{:,.4f}".format(row.latest.price) }}">
-                        {{ price_prefix }}{{ "{:,.4f}".format(row.latest.price) }}
+                      <div class="text-muted small">
+                        {{ row.latest.date }}
                       </div>
                     {% else %}
                       <span class="text-muted">--</span>
                     {% endif %}
-                  </td>
-                  <td class="text-nowrap text-muted">
-                    {{ row.latest.date if row.latest else '--' }}
                   </td>
                   <td>
                     <div class="d-flex justify-content-end gap-2">
