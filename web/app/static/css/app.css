@@ -132,6 +132,30 @@ a:hover {
   font-weight: 600;
   color: var(--text);
 }
+
+@media (max-width: 991.98px) {
+  .ct-navbar .container-xl {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ct-navbar-left {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .ct-nav-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .ct-navbar-right {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
 .ct-card {
   background: var(--card);
   border: 1px solid var(--card-border);
