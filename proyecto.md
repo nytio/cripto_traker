@@ -10,7 +10,7 @@ Construir una plataforma web (dashboard) que permita:
 4. **Acelerar consultas/indicadores** en el backend con **DuckDB** (cálculos analíticos tipo OLAP), sin sobrecargar PostgreSQL.
 5. Mantener una base sólida de **seguridad**, buenas prácticas y **extensibilidad** (p. ej., preparar el terreno para autenticación).
 
-> Arquitectura objetivo: microservicios “ligeros” con Docker Compose (al menos `web` + `db`), red interna segura, y opción de componentes extra (scheduler / Nginx).
+> Arquitectura objetiva: microservicios “ligeros” con Docker Compose (al menos `web` + `db`), red interna segura, y opción de componentes extra (scheduler / Nginx).
 
 ---
 
@@ -52,9 +52,9 @@ Es una política general que la cotización sea solo de ayer, para evitar consul
 ### 1.2 Opcionales recomendados (según fase)
 
 3. **Scheduler (tareas programadas)**  
-   - Para actualizar precios cada 24h:  
-     - Opción A: `APScheduler` dentro de `web`.  
-     - Opción B: `cron` en el contenedor `web`.  
+   - Para actualizar precios cada 24 h:
+     - Opción A: `APScheduler` dentro de `web`.
+     - Opción B: `cron` en el contenedor `web`.
      - Opción C: trigger externo (p. ej. cron del host/servicio) que llame a un endpoint.
    - En el MVP, se puede dejar como **botón manual** “Actualizar cotizaciones” y sumar automatización después.
 
