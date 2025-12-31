@@ -22,12 +22,12 @@
       <div class="d-flex flex-wrap align-items-center gap-2">
         <form method="post" action="{{ url_for('prices.update_prices') }}" data-loading="1">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-sm btn-primary" data-loading-text="Actualizando..." data-loading-spinner="1">
-            Actualizar precios
+          <button type="submit" class="btn btn-sm btn-primary" data-loading-text="Updating..." data-loading-spinner="1">
+            Update prices
           </button>
         </form>
         <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('cryptos.new_crypto') }}">
-          Agregar cripto
+          Add crypto
         </a>
       </div>
     </div>
@@ -118,7 +118,7 @@
           </div>
           <h2 class="h5 mb-2">No assets yet</h2>
           <p class="ct-meta mb-3">Add a crypto to start tracking.</p>
-          <a class="btn btn-sm btn-primary" href="{{ url_for('cryptos.new_crypto') }}">Agregar cripto</a>
+          <a class="btn btn-sm btn-primary" href="{{ url_for('cryptos.new_crypto') }}">Add crypto</a>
         </div>
       {% endif %}
     </div>
