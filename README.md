@@ -22,6 +22,12 @@
 
    http://localhost:8080
 
+4. Cierra los servicios:
+
+   ```bash
+   docker compose down
+   ```
+
 ## Notas
 
 - La base de datos no expone puertos al host; solo está disponible dentro de la red de Compose.
@@ -76,6 +82,12 @@ docker compose --profile nginx up --build
 ## Tests
 
 ```bash
+python3 -m venv env
+source env/bin/activate
+
+python -m pip install -U pip
+python -m pip install pytest
+
 pip install -r requirements-dev.txt
 PYTHONPATH=web pytest
 ```
