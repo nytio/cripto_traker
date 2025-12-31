@@ -10,36 +10,61 @@
     >
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   </head>
-  <body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div class="container">
+  <body class="ct-body">
+    <nav class="navbar navbar-expand-lg navbar-light ct-navbar">
+      <div class="container-xl">
         <a class="navbar-brand" href="{{ url_for('dashboard.index') }}">Crypto Tracker</a>
-        <div class="navbar-nav">
+        <div class="navbar-nav gap-1 ms-2 me-auto">
           {% if current_user %}
-            <a class="nav-link" href="{{ url_for('dashboard.index') }}">Dashboard</a>
-            <a class="nav-link" href="{{ url_for('cryptos.new_crypto') }}">Add crypto</a>
+            {% set dashboard_active = request.endpoint == 'dashboard.index' %}
+            {% set add_active = request.endpoint == 'cryptos.new_crypto' %}
+            <a class="nav-link{% if dashboard_active %} active{% endif %}" {% if dashboard_active %}aria-current="page"{% endif %} href="{{ url_for('dashboard.index') }}">Dashboard</a>
+            <a class="nav-link{% if add_active %} active{% endif %}" {% if add_active %}aria-current="page"{% endif %} href="{{ url_for('cryptos.new_crypto') }}">Add crypto</a>
           {% endif %}
         </div>
         <div class="d-flex align-items-center gap-2">
           {% if current_user %}
-            <span class="navbar-text text-white-50 d-none d-sm-inline">
+            <span class="navbar-text ct-muted d-none d-sm-inline">
               {{ current_user.email }}
             </span>
             <form method="post" action="{{ url_for('auth.logout_post') }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-sm btn-outline-light">Logout</button>
+              <button type="submit" class="btn btn-sm btn-outline-secondary">Logout</button>
             </form>
           {% else %}
-            <a class="btn btn-sm btn-outline-light" href="{{ url_for('auth.login') }}">Login</a>
-            <a class="btn btn-sm btn-light" href="{{ url_for('auth.register') }}">Create account</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auth.login') }}">Login</a>
+            <a class="btn btn-sm btn-primary" href="{{ url_for('auth.register') }}">Create account</a>
           {% endif %}
         </div>
       </div>
     </nav>
 
-    <main class="container py-4">
+    <main class="container-xl py-4 py-lg-5">
       {% block content %}{% endblock %}
     </main>
+
+    <div class="modal fade" id="remove-modal" tabindex="-1" aria-labelledby="remove-modal-label" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="post" data-loading="1" data-remove-form>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-header">
+              <h5 class="modal-title" id="remove-modal-label">Remove crypto?</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="mb-0 text-muted">
+                This will remove <span class="fw-semibold text-dark" data-remove-target="asset">this crypto</span> from your dashboard.
+              </p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-danger" data-loading-text="Removing..." data-loading-spinner="1">Remove</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container">
       {% with messages = get_flashed_messages(with_categories=true) %}

@@ -1,50 +1,111 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h1 class="h3">Dashboard</h1>
-    <form method="post" action="{{ url_for('prices.update_prices') }}" data-loading="1">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn-primary" data-loading-text="Updating...">Update</button>
-    </form>
+  {% set ns = namespace(last_updated=None) %}
+  {% if rows %}
+    {% for row in rows %}
+      {% if row.latest and row.latest.date %}
+        {% if ns.last_updated is none or row.latest.date > ns.last_updated %}
+          {% set ns.last_updated = row.latest.date %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  {% set price_prefix = '$' if currency == 'USD' else '' %}
+
+  <div class="ct-page-header d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Dashboard</h1>
+      <div class="small ct-muted">Last updated: {{ ns.last_updated if ns.last_updated else 'Not available' }}</div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <form method="post" action="{{ url_for('prices.update_prices') }}" data-loading="1">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-sm btn-primary ct-btn-icon" data-loading-text="Updating..." data-loading-spinner="1">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+            <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0-.912-.41A4 4 0 1 1 8 4h1.5a.5.5 0 0 0 0-1H8z"/>
+            <path d="M8 1.5a.5.5 0 0 0-.5.5v2.793L6.354 3.146a.5.5 0 1 0-.708.708l2.147 2.146a.5.5 0 0 0 .707 0l2.147-2.146a.5.5 0 0 0-.708-.708L8.5 4.793V2a.5.5 0 0 0-.5-.5z"/>
+          </svg>
+          <span>Update</span>
+        </button>
+      </form>
+      <a class="btn btn-sm btn-outline-secondary ct-btn-icon" href="{{ url_for('cryptos.new_crypto') }}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+          <path d="M8 3.5a.5.5 0 0 1 .5.5v3.5H12a.5.5 0 0 1 0 1H8.5V12a.5.5 0 0 1-1 0V8.5H4a.5.5 0 0 1 0-1h3.5V4a.5.5 0 0 1 .5-.5z"/>
+        </svg>
+        <span>Add crypto</span>
+      </a>
+    </div>
   </div>
 
   {% if rows %}
-    <div class="card">
+    <div class="ct-card">
+      <div class="ct-card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <h2 class="h6 mb-0">Tracked assets</h2>
+        </div>
+        <div class="ct-search">
+          <span class="ct-search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
+            </svg>
+          </span>
+          <input type="text" class="form-control form-control-sm ps-5" id="asset-search" placeholder="Search name or symbol" aria-label="Search name or symbol" data-search-input data-search-target="#assets-table">
+        </div>
+      </div>
       <div class="table-responsive">
-        <table class="table table-striped mb-0">
+        <table class="table ct-table table-hover align-middle" id="assets-table">
           <thead>
             <tr>
               <th>Name</th>
               <th>Symbol</th>
-              <th>Latest price ({{ currency }})</th>
+              <th class="text-end">Latest price ({{ currency }})</th>
               <th>Date</th>
-              <th>Actions</th>
+              <th class="text-end">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for row in rows %}
-              <tr>
-                <td>{{ row.crypto.name or row.crypto.coingecko_id }}</td>
-                <td class="text-uppercase">{{ row.crypto.symbol or '-' }}</td>
+              {% set name = row.crypto.name or row.crypto.coingecko_id %}
+              {% set symbol = row.crypto.symbol or '' %}
+              <tr data-search-text="{{ name }} {{ symbol }}">
                 <td>
-                  {% if row.latest %}
-                    {{ "%.4f"|format(row.latest.price) }}
+                  <div class="fw-semibold">{{ name }}</div>
+                </td>
+                <td>
+                  {% if symbol %}
+                    <span class="ct-symbol ct-mono">{{ symbol|upper }}</span>
                   {% else %}
-                    --
+                    <span class="text-muted">--</span>
                   {% endif %}
                 </td>
-                <td>{{ row.latest.date if row.latest else '--' }}</td>
+                <td class="text-end ct-mono">
+                  {% if row.latest %}
+                    <span class="fw-semibold">{{ price_prefix }}{{ "%.4f"|format(row.latest.price) }}</span>
+                  {% else %}
+                    <span class="text-muted">--</span>
+                  {% endif %}
+                </td>
+                <td class="text-nowrap ct-muted">
+                  {{ row.latest.date if row.latest else '--' }}
+                </td>
                 <td>
-                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('charts.crypto_detail', crypto_id=row.crypto.id) }}">
-                    View
-                  </a>
-                  <form method="post" action="{{ url_for('cryptos.remove_crypto', crypto_id=row.crypto.id) }}" class="d-inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                      Remove
+                  <div class="d-flex justify-content-end gap-2">
+                    <a class="btn btn-sm btn-light ct-icon-only" href="{{ url_for('charts.crypto_detail', crypto_id=row.crypto.id) }}" aria-label="View" title="View">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+                        <path d="M16 8s-3 5.5-8 5.5S0 8 0 8s3-5.5 8-5.5S16 8 16 8z"/>
+                        <path d="M8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                      </svg>
+                      <span class="visually-hidden">View</span>
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-danger ct-icon-only" data-bs-toggle="modal" data-bs-target="#remove-modal" data-remove-action="{{ url_for('cryptos.remove_crypto', crypto_id=row.crypto.id) }}" data-remove-name="{{ name }}" data-remove-symbol="{{ symbol|upper }}" aria-label="Remove" title="Remove">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+                        <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0v-6zm2-.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5z"/>
+                        <path d="M14.5 3a1 1 0 0 1-1 1H13l-.854 9.604A2 2 0 0 1 10.153 15H5.847a2 2 0 0 1-1.993-1.396L3 4H2.5a1 1 0 0 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4l.805 9.047A1 1 0 0 0 5.847 14h4.306a1 1 0 0 0 .924-.953L11.882 4H4.118z"/>
+                      </svg>
+                      <span class="visually-hidden">Remove</span>
                     </button>
-                  </form>
+                  </div>
                 </td>
               </tr>
             {% endfor %}
@@ -53,10 +114,15 @@
       </div>
     </div>
   {% else %}
-    <div class="card">
-      <div class="card-body">
-        <p class="text-muted mb-0">No data yet. Add a crypto to start tracking.</p>
+    <div class="ct-card p-5 text-center">
+      <div class="mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="text-muted" aria-hidden="true" viewBox="0 0 16 16">
+          <path d="M4 0a2 2 0 0 0-2 2v10.5A3.5 3.5 0 0 0 5.5 16H14a2 2 0 0 0 2-2V5.5a.5.5 0 0 0-.146-.354l-3-3A.5.5 0 0 0 12.5 2H10a2 2 0 0 0-2-2H4zm8 3.5V2.707L14.293 5H13.5a1.5 1.5 0 0 1-1.5-1.5z"/>
+        </svg>
       </div>
+      <h2 class="h5 mb-2">No assets yet</h2>
+      <p class="ct-muted mb-3">Add a crypto to start tracking.</p>
+      <a class="btn btn-sm btn-primary" href="{{ url_for('cryptos.new_crypto') }}">Add crypto</a>
     </div>
   {% endif %}
 {% endblock %}

@@ -30,15 +30,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const loadingText = button.getAttribute("data-loading-text");
       if (isLoading) {
         if (loadingText) {
-          button.dataset.originalText = button.textContent;
-          button.textContent = loadingText;
+          button.dataset.originalHtml = button.innerHTML;
+          const showSpinner = button.dataset.loadingSpinner === "1";
+          const spinner = showSpinner
+            ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>'
+            : "";
+          button.innerHTML = `${spinner}${loadingText}`;
         }
         button.disabled = true;
       } else {
-        const originalText = button.dataset.originalText;
-        if (originalText) {
-          button.textContent = originalText;
-          delete button.dataset.originalText;
+        const originalHtml = button.dataset.originalHtml;
+        if (originalHtml) {
+          button.innerHTML = originalHtml;
+          delete button.dataset.originalHtml;
         }
         button.disabled = false;
       }
@@ -142,4 +146,49 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast(pendingToast.message, pendingToast.variant || "info");
     clearPendingToast();
   }
+
+  const removeModal = document.getElementById("remove-modal");
+  if (removeModal && window.bootstrap) {
+    removeModal.addEventListener("show.bs.modal", (event) => {
+      const trigger = event.relatedTarget;
+      if (!trigger) {
+        return;
+      }
+      const name = trigger.getAttribute("data-remove-name") || "this crypto";
+      const symbol = trigger.getAttribute("data-remove-symbol") || "";
+      const action = trigger.getAttribute("data-remove-action") || "";
+      const assetLabel = symbol ? `${name} (${symbol})` : name;
+      const target = removeModal.querySelector("[data-remove-target='asset']");
+      if (target) {
+        target.textContent = assetLabel;
+      }
+      const form = removeModal.querySelector("[data-remove-form]");
+      if (form && action) {
+        form.setAttribute("action", action);
+      }
+    });
+  }
+
+  document.querySelectorAll("[data-search-input]").forEach((input) => {
+    const targetSelector = input.dataset.searchTarget;
+    if (!targetSelector) {
+      return;
+    }
+    const table = document.querySelector(targetSelector);
+    if (!table) {
+      return;
+    }
+    const rows = Array.from(table.querySelectorAll("tbody tr"));
+    const getRowText = (row) =>
+      (row.dataset.searchText || row.textContent || "").toLowerCase();
+    const filterRows = () => {
+      const term = input.value.trim().toLowerCase();
+      rows.forEach((row) => {
+        const matches = !term || getRowText(row).includes(term);
+        row.classList.toggle("d-none", !matches);
+      });
+    };
+    input.addEventListener("input", filterRows);
+    filterRows();
+  });
 });
