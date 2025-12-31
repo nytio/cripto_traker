@@ -18,63 +18,50 @@
   {% endif %}
   {% set price_prefix = '$' if currency == 'USD' else '' %}
 
-  <div class="ct-page-header mb-4">
-    <a class="d-inline-flex align-items-center gap-2 text-decoration-none ct-meta mb-2" href="{{ url_for('dashboard.index') }}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-        <path d="M15 8a.5.5 0 0 1-.5.5H3.707l4.147 4.146a.5.5 0 0 1-.708.708l-5-5a.5.5 0 0 1 0-.708l5-5a.5.5 0 1 1 .708.708L3.707 7.5H14.5A.5.5 0 0 1 15 8z"/>
-      </svg>
-      Back to Dashboard
-    </a>
-    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-      <div>
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          <h1 class="ct-page-title mb-0">{{ crypto.name or crypto.coingecko_id }}</h1>
-          {% if crypto.symbol %}
-            <span class="ct-symbol ct-mono">{{ crypto.symbol|upper }}</span>
-          {% endif %}
-        </div>
-        <div class="d-flex flex-wrap gap-3 mt-2 ct-meta">
-          <div>
-            Last price:
-            {% if ns.last_price is not none %}
-              <span class="ct-price" title="{{ price_prefix }}{{ "{:,.4f}".format(ns.last_price) }}">{{ price_prefix }}{{ "{:,.2f}".format(ns.last_price) }}</span>
-            {% else %}
-              Not available
+  <section class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+        <div>
+          <a class="btn btn-sm btn-outline-secondary mb-3" href="{{ url_for('dashboard.index') }}">
+            Back
+          </a>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <h1 class="h4 fw-semibold mb-0">{{ crypto.name or crypto.coingecko_id }}</h1>
+            {% if crypto.symbol %}
+              <span class="badge bg-light text-dark text-uppercase ct-mono">{{ crypto.symbol|upper }}</span>
             {% endif %}
-          </div>
-          <div>
-            Last updated: {{ ns.last_date if ns.last_date else 'Not available' }}
+            <span class="badge text-bg-light border">Market: {{ currency }}</span>
           </div>
         </div>
-      </div>
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <form method="get" class="d-flex align-items-center gap-2" id="range-form">
-          <label for="days" class="form-label mb-0 ct-meta">Range</label>
-          <select class="form-select form-select-sm" id="days" name="days" data-crypto-id="{{ crypto.id }}">
-            <option value="0" {% if days == 0 %}selected{% endif %}>All</option>
-            <option value="1825" {% if days == 1825 %}selected{% endif %}>5 years</option>
-            <option value="365" {% if days == 365 %}selected{% endif %}>1 year</option>
-            <option value="180" {% if days == 180 %}selected{% endif %}>6 month</option>
-            <option value="90" {% if days == 90 %}selected{% endif %}>3 month</option>
-          </select>
-        </form>
-        <button class="btn btn-sm btn-primary ct-btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#backfill-modal">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-            <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0-.912-.41A4 4 0 1 1 8 4h1.5a.5.5 0 0 0 0-1H8z"/>
-            <path d="M8 1.5a.5.5 0 0 0-.5.5v2.793L6.354 3.146a.5.5 0 1 0-.708.708l2.147 2.146a.5.5 0 0 0 .707 0l2.147-2.146a.5.5 0 0 0-.708-.708L8.5 4.793V2a.5.5 0 0 0-.5-.5z"/>
-          </svg>
-          <span>Update</span>
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-secondary ct-btn-icon" data-bs-toggle="modal" data-bs-target="#remove-modal" data-remove-action="{{ url_for('cryptos.remove_crypto', crypto_id=crypto.id) }}" data-remove-name="{{ crypto.name or crypto.coingecko_id }}" data-remove-symbol="{{ crypto.symbol|upper if crypto.symbol else '' }}" aria-label="Remove" title="Remove">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-            <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0v-6zm2-.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5z"/>
-            <path d="M14.5 3a1 1 0 0 1-1 1H13l-.854 9.604A2 2 0 0 1 10.153 15H5.847a2 2 0 0 1-1.993-1.396L3 4H2.5a1 1 0 0 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4l.805 9.047A1 1 0 0 0 5.847 14h4.306a1 1 0 0 0 .924-.953L11.882 4H4.118z"/>
-          </svg>
-          <span>Remove</span>
-        </button>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <form method="get" class="d-flex align-items-center gap-2" id="range-form">
+            <label for="days" class="form-label mb-0 text-muted small">Range</label>
+            <select class="form-select form-select-sm" id="days" name="days" data-crypto-id="{{ crypto.id }}">
+              <option value="0" {% if days == 0 %}selected{% endif %}>All</option>
+              <option value="1825" {% if days == 1825 %}selected{% endif %}>5 years</option>
+              <option value="365" {% if days == 365 %}selected{% endif %}>1 year</option>
+              <option value="180" {% if days == 180 %}selected{% endif %}>6 month</option>
+              <option value="90" {% if days == 90 %}selected{% endif %}>3 month</option>
+            </select>
+          </form>
+          <button class="btn btn-sm btn-primary ct-btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#backfill-modal">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+              <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0-.912-.41A4 4 0 1 1 8 4h1.5a.5.5 0 0 0 0-1H8z"/>
+              <path d="M8 1.5a.5.5 0 0 0-.5.5v2.793L6.354 3.146a.5.5 0 1 0-.708.708l2.147 2.146a.5.5 0 0 0 .707 0l2.147-2.146a.5.5 0 0 0-.708-.708L8.5 4.793V2a.5.5 0 0 0-.5-.5z"/>
+            </svg>
+            <span>Update</span>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-danger ct-btn-icon" data-bs-toggle="modal" data-bs-target="#remove-modal" data-remove-action="{{ url_for('cryptos.remove_crypto', crypto_id=crypto.id) }}" data-remove-name="{{ crypto.name or crypto.coingecko_id }}" data-remove-symbol="{{ crypto.symbol|upper if crypto.symbol else '' }}" aria-label="Remove" title="Remove">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+              <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0v-6zm2-.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5z"/>
+              <path d="M14.5 3a1 1 0 0 1-1 1H13l-.854 9.604A2 2 0 0 1 10.153 15H5.847a2 2 0 0 1-1.993-1.396L3 4H2.5a1 1 0 0 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4l.805 9.047A1 1 0 0 0 5.847 14h4.306a1 1 0 0 0 .924-.953L11.882 4H4.118z"/>
+            </svg>
+            <span>Remove</span>
+          </button>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
   <div class="modal fade" id="backfill-modal" tabindex="-1" aria-labelledby="backfill-modal-label" aria-hidden="true">
     <div class="modal-dialog">
@@ -132,46 +119,95 @@
 
 
   {% if series %}
+    {% if ns.change_value is not none %}
+      {% set change_class = 'text-success' if ns.change_value >= 0 else 'text-danger' %}
+    {% else %}
+      {% set change_class = 'text-muted' %}
+    {% endif %}
     <div class="row g-3 mb-3">
-      <div class="col-12 col-md-4">
-        <div class="ct-card ct-kpi p-3 h-100">
-          <div class="ct-meta">Latest price</div>
-          <div class="ct-kpi-value ct-price" title="{{ price_prefix }}{{ "{:,.4f}".format(ns.last_price) if ns.last_price is not none else '--' }}">
-            {% if ns.last_price is not none %}
-              {{ price_prefix }}{{ "{:,.2f}".format(ns.last_price) }}
-            {% else %}
-              --
-            {% endif %}
-          </div>
-          <div class="ct-meta">{{ currency }}</div>
-        </div>
-      </div>
-      <div class="col-12 col-md-4">
-        <div class="ct-card ct-kpi p-3 h-100">
-          <div class="ct-meta">Date</div>
-          <div class="ct-kpi-value">
-            {{ ns.last_date if ns.last_date else 'Not available' }}
-          </div>
-          <div class="ct-meta">Last updated</div>
-        </div>
-      </div>
-      {% if ns.change_value is not none %}
-        {% set change_class = 'text-success' if ns.change_value >= 0 else 'text-danger' %}
-        <div class="col-12 col-md-4">
-          <div class="ct-card ct-kpi p-3 h-100">
-            <div class="ct-meta">Change</div>
-            <div class="ct-kpi-value ct-price {{ change_class }}" title="{{ price_prefix }}{{ "{:,.4f}".format(ns.change_value) }}">
-              {% if ns.change_value >= 0 %}+{% endif %}{{ price_prefix }}{{ "{:,.2f}".format(ns.change_value) }}
+      <div class="col-12 col-md-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 text-muted small">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M2.5 2a.5.5 0 0 0 0 1H4v9a2 2 0 0 0 2 2h5a2 2 0 0 0 2-2V3h1.5a.5.5 0 0 0 0-1h-12zm2.5 1h6v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3z"/>
+                <path d="M5 0a1 1 0 0 0-1 1v1h8V1a1 1 0 0 0-1-1H5z"/>
+              </svg>
+              Latest price
             </div>
-            {% if ns.change_pct is not none %}
-              <div class="ct-meta">{{ "%.2f"|format(ns.change_pct) }}%</div>
-            {% endif %}
+            <div class="fs-4 fw-semibold mt-2 ct-price" title="{{ price_prefix }}{{ "{:,.4f}".format(ns.last_price) if ns.last_price is not none else '--' }}">
+              {% if ns.last_price is not none %}
+                {{ price_prefix }}{{ "{:,.2f}".format(ns.last_price) }}
+              {% else %}
+                --
+              {% endif %}
+            </div>
+            <div class="text-muted small">{{ currency }}</div>
           </div>
         </div>
-      {% endif %}
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 text-muted small">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0-.912-.41A4 4 0 1 1 8 4h1.5a.5.5 0 0 0 0-1H8z"/>
+                <path d="M8 1.5a.5.5 0 0 0-.5.5v2.793L6.354 3.146a.5.5 0 1 0-.708.708l2.147 2.146a.5.5 0 0 0 .707 0l2.147-2.146a.5.5 0 0 0-.708-.708L8.5 4.793V2a.5.5 0 0 0-.5-.5z"/>
+              </svg>
+              24h change
+            </div>
+            <div class="fs-4 fw-semibold mt-2 ct-price {{ change_class }}">
+              {% if ns.change_value is not none %}
+                {% if ns.change_value >= 0 %}+{% endif %}{{ price_prefix }}{{ "{:,.2f}".format(ns.change_value) }}
+              {% else %}
+                --
+              {% endif %}
+            </div>
+            <div class="text-muted small">
+              {% if ns.change_pct is not none %}
+                {{ "%.2f"|format(ns.change_pct) }}%
+              {% else %}
+                --
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 text-muted small">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v1H0V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM0 5h16v9a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5zm4 3a.5.5 0 0 0 0 1h8a.5.5 0 0 0 0-1H4z"/>
+              </svg>
+              Last update
+            </div>
+            <div class="fs-5 fw-semibold mt-2">
+              {{ ns.last_date if ns.last_date else 'Not available' }}
+            </div>
+            <div class="text-muted small">Date</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 text-muted small">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M4 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm9 2a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM0 7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1H0V7zm10-2h4a2 2 0 0 1 2 2v1h-6V7a2 2 0 0 1 2-2zm-4 6a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v1h6v-1zm6-2a2 2 0 0 0-2 2v1h6v-1a2 2 0 0 0-2-2h-2z"/>
+              </svg>
+              Data source
+            </div>
+            <div class="fs-5 fw-semibold mt-2">CoinGecko</div>
+            <div class="text-muted small">Market data</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="ct-card p-3">
-      <div id="price-chart" class="chart-container" data-crypto-id="{{ crypto.id }}" data-series='{{ series|tojson }}' data-prophet='{{ prophet_forecast|tojson }}' data-prophet-cutoff="{{ prophet_cutoff or '' }}" data-prophet-line="{{ prophet_line_date or '' }}" data-lstm='{{ lstm_forecast|tojson }}' data-lstm-cutoff="{{ lstm_cutoff or '' }}" data-lstm-line="{{ lstm_line_date or '' }}" data-gru='{{ gru_forecast|tojson }}' data-gru-cutoff="{{ gru_cutoff or '' }}" data-gru-line="{{ gru_line_date or '' }}" data-currency="{{ currency }}"></div>
+    <div class="card shadow-sm mb-3">
+      <div class="card-body p-3">
+        <div id="price-chart" class="chart-container bg-white rounded-3" data-crypto-id="{{ crypto.id }}" data-series='{{ series|tojson }}' data-prophet='{{ prophet_forecast|tojson }}' data-prophet-cutoff="{{ prophet_cutoff or '' }}" data-prophet-line="{{ prophet_line_date or '' }}" data-lstm='{{ lstm_forecast|tojson }}' data-lstm-cutoff="{{ lstm_cutoff or '' }}" data-lstm-line="{{ lstm_line_date or '' }}" data-gru='{{ gru_forecast|tojson }}' data-gru-cutoff="{{ gru_cutoff or '' }}" data-gru-line="{{ gru_line_date or '' }}" data-currency="{{ currency }}"></div>
+      </div>
     </div>
     <div class="ct-card p-3 mt-3">
       <div class="ct-toolbar">
