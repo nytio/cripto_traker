@@ -66,6 +66,7 @@ a:hover {
   padding-top: 0.6rem;
   padding-bottom: 0.6rem;
   transition: transform 0.25s ease, opacity 0.25s ease;
+  z-index: 1030;
 }
 
 .ct-navbar .navbar-brand {
@@ -140,27 +141,93 @@ a:hover {
   color: var(--muted);
 }
 
+.ct-navbar-inner {
+  position: relative;
+}
+
+.ct-navbar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1020;
+  display: none;
+}
+
+.ct-navbar-overlay.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ct-navbar .ct-navbar-toggler {
+  border: 1px solid var(--ct-border-strong);
+  border-radius: 10px;
+  padding: 0.35rem 0.55rem;
+}
+
 @media (max-width: 991.98px) {
-  .ct-navbar .container-xl {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .ct-navbar-left {
-    flex-direction: column;
+  .ct-navbar .ct-navbar-inner {
     align-items: flex-start;
-    gap: 0.5rem;
   }
 
-  .ct-nav-actions {
+  .ct-navbar .ct-navbar-brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 0.15rem;
+  }
+
+  .ct-navbar .ct-navbar-toggler {
+    padding: 0.3rem 0.4rem;
+    margin-right: auto;
+  }
+
+  .ct-navbar .navbar-toggler-icon {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .ct-navbar .ct-navbar-collapse {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1040;
+    margin-top: 0.5rem;
+    padding: 0.9rem 1rem;
+    width: min(320px, 92vw);
+    border-radius: 16px;
+    border: 1px solid var(--ct-border);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--ct-shadow-float);
+    text-align: left;
+  }
+
+  .ct-navbar-overlay {
+    display: block;
+  }
+
+  .ct-nav-actions,
+  .ct-navbar-left,
+  .ct-navbar-right {
+    width: 100%;
+  }
+
+  .ct-nav-actions,
+  .ct-navbar-right {
     flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  .ct-navbar .nav-link {
     width: 100%;
   }
 
   .ct-navbar-right {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    width: 100%;
+    border-top: 1px solid var(--ct-border);
+    padding-top: 0.75rem;
   }
 }
 .ct-card {

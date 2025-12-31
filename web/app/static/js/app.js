@@ -167,6 +167,58 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const navbarCollapse = document.getElementById("ct-navbar");
+  if (navbarCollapse) {
+    const navbarOverlay = document.querySelector("[data-ct-navbar-overlay]");
+    const showOverlay = () => {
+      if (navbarOverlay) {
+        navbarOverlay.classList.add("is-active");
+      }
+    };
+    const hideOverlay = () => {
+      if (navbarOverlay) {
+        navbarOverlay.classList.remove("is-active");
+      }
+    };
+
+    navbarCollapse.addEventListener("show.bs.collapse", showOverlay);
+    navbarCollapse.addEventListener("hidden.bs.collapse", hideOverlay);
+    navbarCollapse.addEventListener("hide.bs.collapse", hideOverlay);
+
+    const syncOverlay = () => {
+      if (!navbarOverlay) {
+        return;
+      }
+      const isMobile = window.matchMedia("(max-width: 991.98px)").matches;
+      if (isMobile && navbarCollapse.classList.contains("show")) {
+        showOverlay();
+      } else {
+        hideOverlay();
+      }
+    };
+
+    if (navbarOverlay) {
+      navbarOverlay.addEventListener("click", () => {
+        if (window.bootstrap && bootstrap.Collapse) {
+          const instance = bootstrap.Collapse.getOrCreateInstance(
+            navbarCollapse,
+          );
+          instance.hide();
+        } else {
+          navbarCollapse.classList.remove("show");
+          hideOverlay();
+        }
+      });
+    }
+
+    const desktopMedia = window.matchMedia("(min-width: 992px)");
+    if (desktopMedia.addEventListener) {
+      desktopMedia.addEventListener("change", syncOverlay);
+    } else {
+      desktopMedia.addListener(syncOverlay);
+    }
+  }
+
   const removeModal = document.getElementById("remove-modal");
   if (removeModal && window.bootstrap) {
     removeModal.addEventListener("show.bs.modal", (event) => {
