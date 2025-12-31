@@ -19,7 +19,7 @@
   {% set price_prefix = '$' if currency == 'USD' else '' %}
 
   <div class="ct-page-header mb-4">
-    <a class="d-inline-flex align-items-center gap-2 text-decoration-none ct-muted small mb-2" href="{{ url_for('dashboard.index') }}">
+    <a class="d-inline-flex align-items-center gap-2 text-decoration-none ct-meta mb-2" href="{{ url_for('dashboard.index') }}">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
         <path d="M15 8a.5.5 0 0 1-.5.5H3.707l4.147 4.146a.5.5 0 0 1-.708.708l-5-5a.5.5 0 0 1 0-.708l5-5a.5.5 0 1 1 .708.708L3.707 7.5H14.5A.5.5 0 0 1 15 8z"/>
       </svg>
@@ -28,16 +28,16 @@
     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
       <div>
         <div class="d-flex flex-wrap align-items-center gap-2">
-          <h1 class="h3 mb-0">{{ crypto.name or crypto.coingecko_id }}</h1>
+          <h1 class="ct-page-title mb-0">{{ crypto.name or crypto.coingecko_id }}</h1>
           {% if crypto.symbol %}
             <span class="ct-symbol ct-mono">{{ crypto.symbol|upper }}</span>
           {% endif %}
         </div>
-        <div class="d-flex flex-wrap gap-3 mt-2 small ct-muted">
+        <div class="d-flex flex-wrap gap-3 mt-2 ct-meta">
           <div>
             Last price:
             {% if ns.last_price is not none %}
-              <span class="ct-mono">{{ price_prefix }}{{ "%.4f"|format(ns.last_price) }}</span>
+              <span class="ct-price" title="{{ price_prefix }}{{ "{:,.4f}".format(ns.last_price) }}">{{ price_prefix }}{{ "{:,.2f}".format(ns.last_price) }}</span>
             {% else %}
               Not available
             {% endif %}
@@ -49,7 +49,7 @@
       </div>
       <div class="d-flex flex-wrap align-items-center gap-2">
         <form method="get" class="d-flex align-items-center gap-2" id="range-form">
-          <label for="days" class="form-label mb-0 small ct-muted">Range</label>
+          <label for="days" class="form-label mb-0 ct-meta">Range</label>
           <select class="form-select form-select-sm" id="days" name="days" data-crypto-id="{{ crypto.id }}">
             <option value="0" {% if days == 0 %}selected{% endif %}>All</option>
             <option value="1825" {% if days == 1825 %}selected{% endif %}>5 years</option>
@@ -58,14 +58,14 @@
             <option value="90" {% if days == 90 %}selected{% endif %}>3 month</option>
           </select>
         </form>
-        <button class="btn btn-sm btn-outline-secondary ct-btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#backfill-modal">
+        <button class="btn btn-sm btn-primary ct-btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#backfill-modal">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
             <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0-.912-.41A4 4 0 1 1 8 4h1.5a.5.5 0 0 0 0-1H8z"/>
             <path d="M8 1.5a.5.5 0 0 0-.5.5v2.793L6.354 3.146a.5.5 0 1 0-.708.708l2.147 2.146a.5.5 0 0 0 .707 0l2.147-2.146a.5.5 0 0 0-.708-.708L8.5 4.793V2a.5.5 0 0 0-.5-.5z"/>
           </svg>
           <span>Update</span>
         </button>
-        <button type="button" class="btn btn-sm btn-outline-danger ct-btn-icon" data-bs-toggle="modal" data-bs-target="#remove-modal" data-remove-action="{{ url_for('cryptos.remove_crypto', crypto_id=crypto.id) }}" data-remove-name="{{ crypto.name or crypto.coingecko_id }}" data-remove-symbol="{{ crypto.symbol|upper if crypto.symbol else '' }}" aria-label="Remove" title="Remove">
+        <button type="button" class="btn btn-sm btn-outline-secondary ct-btn-icon" data-bs-toggle="modal" data-bs-target="#remove-modal" data-remove-action="{{ url_for('cryptos.remove_crypto', crypto_id=crypto.id) }}" data-remove-name="{{ crypto.name or crypto.coingecko_id }}" data-remove-symbol="{{ crypto.symbol|upper if crypto.symbol else '' }}" aria-label="Remove" title="Remove">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
             <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0v-6zm2-.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5z"/>
             <path d="M14.5 3a1 1 0 0 1-1 1H13l-.854 9.604A2 2 0 0 1 10.153 15H5.847a2 2 0 0 1-1.993-1.396L3 4H2.5a1 1 0 0 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4l.805 9.047A1 1 0 0 0 5.847 14h4.306a1 1 0 0 0 .924-.953L11.882 4H4.118z"/>
@@ -134,96 +134,94 @@
   {% if series %}
     <div class="row g-3 mb-3">
       <div class="col-12 col-md-4">
-        <div class="ct-card p-3 h-100">
-          <div class="small ct-muted">Latest price</div>
-          <div class="h4 mb-1 ct-mono">
+        <div class="ct-card ct-kpi p-3 h-100">
+          <div class="ct-meta">Latest price</div>
+          <div class="ct-kpi-value ct-price" title="{{ price_prefix }}{{ "{:,.4f}".format(ns.last_price) if ns.last_price is not none else '--' }}">
             {% if ns.last_price is not none %}
-              {{ price_prefix }}{{ "%.4f"|format(ns.last_price) }}
+              {{ price_prefix }}{{ "{:,.2f}".format(ns.last_price) }}
             {% else %}
               --
             {% endif %}
           </div>
-          <div class="small ct-muted">{{ currency }}</div>
+          <div class="ct-meta">{{ currency }}</div>
         </div>
       </div>
       <div class="col-12 col-md-4">
-        <div class="ct-card p-3 h-100">
-          <div class="small ct-muted">Date</div>
-          <div class="h4 mb-1">
+        <div class="ct-card ct-kpi p-3 h-100">
+          <div class="ct-meta">Date</div>
+          <div class="ct-kpi-value">
             {{ ns.last_date if ns.last_date else 'Not available' }}
           </div>
-          <div class="small ct-muted">Last updated</div>
+          <div class="ct-meta">Last updated</div>
         </div>
       </div>
       {% if ns.change_value is not none %}
         {% set change_class = 'text-success' if ns.change_value >= 0 else 'text-danger' %}
         <div class="col-12 col-md-4">
-          <div class="ct-card p-3 h-100">
-            <div class="small ct-muted">Change</div>
-            <div class="h4 mb-1 ct-mono {{ change_class }}">
-              {% if ns.change_value >= 0 %}+{% endif %}{{ "%.4f"|format(ns.change_value) }}
+          <div class="ct-card ct-kpi p-3 h-100">
+            <div class="ct-meta">Change</div>
+            <div class="ct-kpi-value ct-price {{ change_class }}" title="{{ price_prefix }}{{ "{:,.4f}".format(ns.change_value) }}">
+              {% if ns.change_value >= 0 %}+{% endif %}{{ price_prefix }}{{ "{:,.2f}".format(ns.change_value) }}
             </div>
             {% if ns.change_pct is not none %}
-              <div class="small ct-muted">{{ "%.2f"|format(ns.change_pct) }}%</div>
+              <div class="ct-meta">{{ "%.2f"|format(ns.change_pct) }}%</div>
             {% endif %}
           </div>
         </div>
       {% endif %}
     </div>
-    <div class="ct-card">
-      <div class="card-body">
-        <div id="price-chart" class="chart-container" data-crypto-id="{{ crypto.id }}" data-series='{{ series|tojson }}' data-prophet='{{ prophet_forecast|tojson }}' data-prophet-cutoff="{{ prophet_cutoff or '' }}" data-prophet-line="{{ prophet_line_date or '' }}" data-lstm='{{ lstm_forecast|tojson }}' data-lstm-cutoff="{{ lstm_cutoff or '' }}" data-lstm-line="{{ lstm_line_date or '' }}" data-gru='{{ gru_forecast|tojson }}' data-gru-cutoff="{{ gru_cutoff or '' }}" data-gru-line="{{ gru_line_date or '' }}" data-currency="{{ currency }}"></div>
-      </div>
+    <div class="ct-card p-3">
+      <div id="price-chart" class="chart-container" data-crypto-id="{{ crypto.id }}" data-series='{{ series|tojson }}' data-prophet='{{ prophet_forecast|tojson }}' data-prophet-cutoff="{{ prophet_cutoff or '' }}" data-prophet-line="{{ prophet_line_date or '' }}" data-lstm='{{ lstm_forecast|tojson }}' data-lstm-cutoff="{{ lstm_cutoff or '' }}" data-lstm-line="{{ lstm_line_date or '' }}" data-gru='{{ gru_forecast|tojson }}' data-gru-cutoff="{{ gru_cutoff or '' }}" data-gru-line="{{ gru_line_date or '' }}" data-currency="{{ currency }}"></div>
     </div>
     <div class="ct-card p-3 mt-3">
-      <div class="d-flex flex-wrap gap-3 align-items-center">
-        <div class="form-check">
+      <div class="ct-toolbar">
+        <div class="form-check ct-chip">
           <input class="form-check-input" type="checkbox" value="Precio unico" id="toggle-price-mode">
           <label class="form-check-label" for="toggle-price-mode">Price</label>
         </div>
-        <div class="form-check">
+        <div class="form-check ct-chip">
           <input class="form-check-input" type="checkbox" value="SMA 7" id="toggle-sma-7">
           <label class="form-check-label" for="toggle-sma-7">SMA 7</label>
         </div>
-        <div class="form-check">
+        <div class="form-check ct-chip">
           <input class="form-check-input" type="checkbox" value="SMA 30" id="toggle-sma-30">
           <label class="form-check-label" for="toggle-sma-30">SMA 30</label>
         </div>
-        <div class="form-check">
+        <div class="form-check ct-chip">
           <input class="form-check-input" type="checkbox" value="Bollinger" id="toggle-bollinger">
           <label class="form-check-label" for="toggle-bollinger">Bollinger</label>
         </div>
-        <div class="form-check">
+        <div class="form-check ct-chip">
           <input class="form-check-input" type="checkbox" value="Prophet" id="toggle-prophet">
           <label class="form-check-label" for="toggle-prophet">Prophet</label>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#prophet-modal">
+        <button class="btn btn-sm btn-outline-secondary ct-toolbar-action" type="button" data-bs-toggle="modal" data-bs-target="#prophet-modal">
           Update
         </button>
-        <div class="form-check">
+        <div class="form-check ct-chip">
           <input class="form-check-input" type="checkbox" value="LSTM" id="toggle-lstm">
           <label class="form-check-label" for="toggle-lstm">LSTM</label>
         </div>
         <form method="post" action="{{ url_for('charts.recalculate_lstm', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="range_days" value="{{ days }}">
-          <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Calculando...">Update</button>
+          <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-action" data-loading-text="Calculando...">Update</button>
         </form>
-        <div class="form-check">
+        <div class="form-check ct-chip">
           <input class="form-check-input" type="checkbox" value="GRU" id="toggle-gru">
           <label class="form-check-label" for="toggle-gru">GRU</label>
         </div>
         <form method="post" action="{{ url_for('charts.recalculate_gru', crypto_id=crypto.id) }}" class="d-flex align-items-center" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="range_days" value="{{ days }}">
-          <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Calculando...">Update</button>
+          <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-action" data-loading-text="Calculando...">Update</button>
         </form>
       </div>
     </div>
   {% else %}
     <div class="ct-card">
       <div class="card-body">
-        <p class="text-muted mb-0">No price history yet. Update prices to see the chart.</p>
+        <p class="ct-meta mb-0">No price history yet. Update prices to see the chart.</p>
       </div>
     </div>
   {% endif %}

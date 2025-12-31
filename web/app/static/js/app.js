@@ -147,6 +147,16 @@ document.addEventListener("DOMContentLoaded", () => {
     clearPendingToast();
   }
 
+  if (window.bootstrap && bootstrap.Tooltip) {
+    document.querySelectorAll("[data-ct-tooltip]").forEach((el) => {
+      const tooltipText = el.getAttribute("data-ct-tooltip");
+      if (tooltipText && !el.getAttribute("title")) {
+        el.setAttribute("title", tooltipText);
+      }
+      new bootstrap.Tooltip(el);
+    });
+  }
+
   const removeModal = document.getElementById("remove-modal");
   if (removeModal && window.bootstrap) {
     removeModal.addEventListener("show.bs.modal", (event) => {
