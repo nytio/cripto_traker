@@ -88,19 +88,11 @@
                   </td>
                   <td>
                     <div class="d-flex justify-content-end gap-2">
-                      <a class="btn btn-sm ct-icon-btn" href="{{ url_for('charts.crypto_detail', crypto_id=row.crypto.id) }}" aria-label="View" title="View" data-ct-tooltip="View">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-                          <path d="M16 8s-3 5.5-8 5.5S0 8 0 8s3-5.5 8-5.5S16 8 16 8z"/>
-                          <path d="M8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
-                        </svg>
-                        <span class="visually-hidden">View</span>
+                      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('charts.crypto_detail', crypto_id=row.crypto.id) }}" aria-label="View details" title="View details">
+                        View
                       </a>
-                      <button type="button" class="btn btn-sm ct-icon-btn ct-icon-btn--danger" data-bs-toggle="modal" data-bs-target="#remove-modal" data-remove-action="{{ url_for('cryptos.remove_crypto', crypto_id=row.crypto.id) }}" data-remove-name="{{ name }}" data-remove-symbol="{{ symbol|upper }}" aria-label="Remove" title="Remove" data-ct-tooltip="Remove">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-                          <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0v-6zm2-.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5z"/>
-                          <path d="M14.5 3a1 1 0 0 1-1 1H13l-.854 9.604A2 2 0 0 1 10.153 15H5.847a2 2 0 0 1-1.993-1.396L3 4H2.5a1 1 0 0 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4l.805 9.047A1 1 0 0 0 5.847 14h4.306a1 1 0 0 0 .924-.953L11.882 4H4.118z"/>
-                        </svg>
-                        <span class="visually-hidden">Remove</span>
+                      <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#remove-modal" data-remove-action="{{ url_for('cryptos.remove_crypto', crypto_id=row.crypto.id) }}" data-remove-name="{{ name }}" data-remove-symbol="{{ symbol|upper }}" aria-label="Remove crypto" title="Remove crypto">
+                        Remove
                       </button>
                     </div>
                   </td>
