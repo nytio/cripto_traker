@@ -82,11 +82,12 @@ docker compose --profile nginx up --build
 ## Tests
 
 ```bash
+sudo apt update
+sudo apt install python3-venv python3-pip
+
 python3 -m venv env
 source env/bin/activate
-
-python -m pip install -U pip
-python -m pip install pytest
+python -m pip install --upgrade pip
 
 pip install -r requirements-dev.txt
 PYTHONPATH=web pytest
