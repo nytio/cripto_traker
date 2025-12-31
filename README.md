@@ -4,7 +4,7 @@
 
 - Docker y Docker Compose
 
-## Inicio rapido
+## Inicio rápido
 
 1. Copiar el archivo de variables de entorno:
 
@@ -20,11 +20,11 @@
 
 3. Abrir la app en el navegador:
 
-   http://localhost:8000
+   http://localhost:8080
 
 ## Notas
 
-- La base de datos no expone puertos al host; solo esta disponible dentro de la red de Compose.
+- La base de datos no expone puertos al host; solo está disponible dentro de la red de Compose.
 - Este repo inicia con un esqueleto de Flask y estructura de servicios y rutas.
 - Configura `COINGECKO_VS_CURRENCY` si quieres usar otra moneda de referencia (default: usd).
 - Puedes limitar la carga historica con `MAX_HISTORY_DAYS` (default: 365).
@@ -40,15 +40,15 @@
 
 ## Backfill historico
 
-En la vista de detalle puedes solicitar un backfill de X dias. El sistema calcula los dias faltantes y solo pide esos rangos a CoinGecko, pausando entre requests.
+En la vista de detalle puedes solicitar un backfill de X dias. El sistema calcula los días faltantes y solo pide esos rangos a CoinGecko, pausando entre requests.
 
 ## Actualizacion manual
 
-Los botones de actualizacion manual usan el dia anterior para evitar variaciones intradia.
+Los botones de actualización manual usan el día anterior para evitar variaciones intradía.
 
 ## Auth (placeholder)
 
-Se incluyen rutas `/login` y `/logout` y un modelo `users` como base para futura autenticacion.
+Se incluyen rutas `/login` y `/logout` y un modelo `users` como base para autenticacion.
 
 ## Scheduler opcional
 
@@ -76,6 +76,6 @@ docker compose --profile nginx up --build
 ## Tests
 
 ```bash
-pip install -r web/requirements.txt -r requirements-dev.txt
+pip install -r requirements-dev.txt
 PYTHONPATH=web pytest
 ```
