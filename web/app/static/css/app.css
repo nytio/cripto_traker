@@ -173,49 +173,9 @@ a:hover {
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.ct-card-header {
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.ct-page-header {
-  padding-bottom: 0.5rem;
-}
-
-.ct-page-title {
-  font-weight: 650;
-  font-size: 1.35rem;
-}
-
 .ct-meta {
   font-size: 0.78rem;
   color: var(--ct-muted);
-}
-
-.ct-kpi {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.ct-kpi-value {
-  font-size: 1.45rem;
-  font-weight: 600;
-  margin: 0.25rem 0;
-}
-
-.ct-symbol {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--ct-text);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 600;
 }
 
 .ct-search {
@@ -242,39 +202,6 @@ a:hover {
   gap: 0.5rem;
 }
 
-.ct-icon-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--ct-radius-sm);
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid var(--ct-border);
-  color: var(--ct-text);
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease,
-    color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.ct-icon-btn:hover,
-.ct-icon-btn:focus {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--ct-text);
-}
-
-.ct-icon-btn:focus-visible {
-  box-shadow: 0 0 0 0.2rem rgba(10, 132, 255, 0.2);
-}
-
-.ct-icon-btn--danger:hover,
-.ct-icon-btn--danger:focus {
-  border-color: rgba(255, 59, 48, 0.35);
-  color: var(--ct-danger);
-  background: rgba(255, 59, 48, 0.08);
-}
-
 .btn {
   border-radius: var(--ct-radius-sm);
   transition: background-color 0.2s ease, border-color 0.2s ease,
@@ -296,15 +223,6 @@ a:hover {
   min-height: 32px;
   padding: 0.25rem 0.75rem;
   font-size: 0.84rem;
-}
-
-.btn.ct-icon-btn {
-  padding: 0;
-}
-
-.btn-light {
-  background: #f9fafb;
-  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .btn-primary {
