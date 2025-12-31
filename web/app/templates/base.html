@@ -29,12 +29,6 @@
             <span class="navbar-text ct-user d-none d-sm-inline">
               {{ current_user.email }}
             </span>
-            <form method="post" action="{{ url_for('prices.update_prices') }}" data-loading="1">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-sm btn-primary ct-toolbar-btn" data-loading-text="Updating..." data-loading-spinner="1">
-                Update
-              </button>
-            </form>
             <form method="post" action="{{ url_for('auth.logout_post') }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-btn">Logout</button>
