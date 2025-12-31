@@ -59,9 +59,10 @@ a:hover {
 }
 
 .ct-navbar {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.8);
   border-bottom: 1px solid var(--ct-border);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   padding-top: 0.6rem;
   padding-bottom: 0.6rem;
 }
@@ -74,7 +75,7 @@ a:hover {
 }
 
 .ct-navbar .nav-link {
-  color: #374151;
+  color: var(--text);
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
   position: relative;
@@ -83,14 +84,35 @@ a:hover {
   transition: color 0.2s ease, background-color 0.2s ease;
 }
 
+.ct-navbar .nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  bottom: 0.15rem;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(10, 132, 255, 0.35);
+  opacity: 0;
+  transform: scaleX(0.6);
+  transform-origin: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
 .ct-navbar .nav-link:hover,
 .ct-navbar .nav-link:focus {
   color: var(--ct-text);
 }
 
 .ct-navbar .nav-link.active {
-  color: var(--ct-primary);
-  background: rgba(10, 132, 255, 0.12);
+  color: var(--primary);
+}
+
+.ct-navbar .nav-link:hover::after,
+.ct-navbar .nav-link:focus-visible::after,
+.ct-navbar .nav-link.active::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .ct-navbar .nav-link:focus-visible {
@@ -100,6 +122,15 @@ a:hover {
 
 .ct-navbar .navbar-text {
   font-size: 0.85rem;
+}
+
+.ct-user {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--ct-border);
+  font-weight: 600;
+  color: var(--text);
 }
 .ct-card {
   background: var(--card);
@@ -219,6 +250,13 @@ a:hover {
     color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.ct-toolbar-btn {
+  border-radius: 10px;
+}
+
+.ct-toolbar-btn:focus-visible {
+  box-shadow: 0 0 0 0.2rem rgba(10, 132, 255, 0.2);
+}
 .btn:focus-visible {
   box-shadow: 0 0 0 0.2rem rgba(10, 132, 255, 0.2);
 }
