@@ -147,6 +147,16 @@ document.addEventListener("DOMContentLoaded", () => {
     clearPendingToast();
   }
 
+  document.querySelectorAll("form[data-validate='1']").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      form.classList.add("was-validated");
+    });
+  });
+
   if (window.bootstrap && bootstrap.Tooltip) {
     document.querySelectorAll("[data-ct-tooltip]").forEach((el) => {
       const tooltipText = el.getAttribute("data-ct-tooltip");
