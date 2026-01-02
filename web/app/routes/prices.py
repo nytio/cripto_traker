@@ -8,6 +8,8 @@ from ..services.coingecko import CoinGeckoClient
 from ..services.coincap import CoincapClient
 from ..services.price_updater import (
     backfill_historical_prices,
+    fill_missing_prices,
+    inspect_missing_prices,
     update_daily_prices,
     update_single_price,
 )
@@ -24,6 +26,16 @@ def _redirect_with_days(crypto_id: int):
             url_for("charts.crypto_detail", crypto_id=crypto_id, days=days_raw)
         )
     return redirect(url_for("charts.crypto_detail", crypto_id=crypto_id))
+
+
+def _format_missing_dates(dates: list[date]) -> str:
+    if not dates:
+        return ""
+    dates_sorted = sorted(dates)
+    if len(dates_sorted) <= 30:
+        return ", ".join(day.isoformat() for day in dates_sorted)
+    preview = ", ".join(day.isoformat() for day in dates_sorted[:30])
+    return f"{preview}, ... ({len(dates_sorted)} total)"
 
 
 @bp.post("/update")
@@ -107,15 +119,12 @@ def backfill_prices(crypto_id: int):
         return redirect(url_for("dashboard.index"))
     days_raw = request.form.get("history_days", "").strip()
     days = int(days_raw) if days_raw.isdigit() else 0
-    if days <= 0:
-        flash("History days must be greater than zero", "error")
+    if days < 0:
+        flash("History days must be greater than or equal to zero", "error")
         return _redirect_with_days(crypto_id)
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
     max_request_days = min(365, max_days)
-    if days > max_days:
-        days = max_days
-        flash(f"History days limited to {max_days}", "warning")
 
     client = CoinGeckoClient(
         current_app.config["COINGECKO_BASE_URL"],
@@ -138,24 +147,66 @@ def backfill_prices(crypto_id: int):
     coincap_request_delay = current_app.config["COINCAP_REQUEST_DELAY"]
 
     try:
-        result = backfill_historical_prices(
-            crypto_id,
-            client,
-            vs_currency=vs_currency,
-            days=days,
-            request_delay=request_delay,
-            max_history_days=max_days,
-            max_request_days=max_request_days,
-            coincap_client=coincap_client,
-            coincap_request_delay=coincap_request_delay,
-        )
-        if result["requested"] == 0:
-            flash("History already complete for this range", "success")
-        else:
+        if days == 0:
+            inspect_result = inspect_missing_prices(crypto_id)
+            missing_dates = inspect_result.get("missing_dates", [])
+            if not inspect_result.get("has_history", False):
+                flash("No price history to verify", "info")
+                return _redirect_with_days(crypto_id)
+            if not missing_dates:
+                flash("History already complete between first and last date", "success")
+                return _redirect_with_days(crypto_id)
+            start_date = inspect_result.get("start_date")
+            end_date = inspect_result.get("end_date")
+            total_days = inspect_result.get("total_days", 0)
+            stored_days = inspect_result.get("stored_days", 0)
+            if start_date and end_date:
+                flash(
+                    (
+                        f"History range: {start_date.isoformat()} to {end_date.isoformat()} "
+                        f"({stored_days}/{total_days} days stored)"
+                    ),
+                    "info",
+                )
+            missing_message = _format_missing_dates(missing_dates)
+            flash(f"Missing days: {missing_message}", "info")
+            result = fill_missing_prices(
+                crypto_id,
+                vs_currency=vs_currency,
+                request_delay=request_delay,
+                max_request_days=max_request_days,
+                coincap_client=coincap_client,
+                coincap_request_delay=coincap_request_delay,
+            )
             flash(
-                f"Backfill done: {result['inserted']} prices from {result['requested']} request(s)",
+                (
+                    "History verified: "
+                    f"{result['inserted']} prices from {result['requested']} request(s)"
+                ),
                 "success",
             )
+        else:
+            if days > max_days:
+                days = max_days
+                flash(f"History days limited to {max_days}", "warning")
+            result = backfill_historical_prices(
+                crypto_id,
+                client,
+                vs_currency=vs_currency,
+                days=days,
+                request_delay=request_delay,
+                max_history_days=max_days,
+                max_request_days=max_request_days,
+                coincap_client=coincap_client,
+                coincap_request_delay=coincap_request_delay,
+            )
+            if result["requested"] == 0:
+                flash("History already complete for this range", "success")
+            else:
+                flash(
+                    f"Backfill done: {result['inserted']} prices from {result['requested']} request(s)",
+                    "success",
+                )
     except Exception as exc:
         flash(f"Failed to backfill history: {exc}", "error")
 

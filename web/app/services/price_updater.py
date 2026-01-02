@@ -259,19 +259,22 @@ def backfill_historical_prices(
     latest_date = session.execute(
         select(func.max(Price.date)).where(Price.crypto_id == crypto_id)
     ).scalar_one_or_none()
-    end_date = today - timedelta(days=1)
-    if latest_date:
-        end_date = min(latest_date, end_date)
+    earliest_date = session.execute(
+        select(func.min(Price.date)).where(Price.crypto_id == crypto_id)
+    ).scalar_one_or_none()
 
-    min_allowed_date = end_date - timedelta(days=max_days - 1)
+    anchor_latest = latest_date or (today - timedelta(days=1))
+    min_allowed_date = anchor_latest - timedelta(days=max_days - 1)
+    if earliest_date:
+        end_date = earliest_date - timedelta(days=1)
+    else:
+        end_date = min(today - timedelta(days=1), anchor_latest)
     if end_date < min_allowed_date:
         return {"inserted": 0, "requested": 0, "ranges": []}
 
-    def build_window(target_end: date) -> tuple[date, date]:
-        start = target_end - timedelta(days=days - 1)
-        if start < min_allowed_date:
-            start = min_allowed_date
-        return start, target_end
+    start_date = end_date - timedelta(days=days - 1)
+    if start_date < min_allowed_date:
+        start_date = min_allowed_date
 
     def fetch_existing_dates(start: date, end: date) -> set[date]:
         rows = session.execute(
@@ -282,22 +285,8 @@ def backfill_historical_prices(
         ).all()
         return {row[0] for row in rows}
 
-    start_date, end_date = build_window(end_date)
     existing_dates = fetch_existing_dates(start_date, end_date)
     missing_ranges = _compute_missing_ranges(start_date, end_date, existing_dates)
-
-    if not missing_ranges:
-        earliest_date = session.execute(
-            select(func.min(Price.date)).where(Price.crypto_id == crypto_id)
-        ).scalar_one_or_none()
-        if earliest_date:
-            fallback_end = earliest_date - timedelta(days=1)
-            if fallback_end >= min_allowed_date:
-                start_date, end_date = build_window(fallback_end)
-                existing_dates = fetch_existing_dates(start_date, end_date)
-                missing_ranges = _compute_missing_ranges(
-                    start_date, end_date, existing_dates
-                )
 
     if not missing_ranges:
         return {"inserted": 0, "requested": 0, "ranges": []}
@@ -312,13 +301,9 @@ def backfill_historical_prices(
             _split_date_range(range_start, range_end, max_chunk_days)
         )
 
-    boundary = date.today() - timedelta(days=COINGECKO_DAILY_LIMIT_DAYS)
-    historical_ranges, recent_ranges = _split_ranges_by_boundary(
-        request_ranges, boundary
-    )
-    if historical_ranges and not coincap_client:
-        raise CoincapError("Coincap client required for historical ranges")
-    if historical_ranges and vs_currency.lower() != "usd":
+    if not coincap_client:
+        raise CoincapError("Coincap client required for backfill")
+    if vs_currency.lower() != "usd":
         raise CoincapError("Coincap only supports USD historical prices")
     if coincap_request_delay is None:
         coincap_request_delay = request_delay
@@ -344,17 +329,25 @@ def backfill_historical_prices(
         existing_dates.update(by_date.keys())
         return len(records)
 
-    for idx, (range_start, range_end) in enumerate(recent_ranges):
-        from_ts = _to_timestamp(range_start, end_of_day=False)
-        to_ts = _to_timestamp(range_end, end_of_day=True)
-        payload = client.get_market_chart_range(
-            crypto.coingecko_id, vs_currency, from_ts, to_ts
+    for idx, (range_start, range_end) in enumerate(request_ranges):
+        from_ts = _to_timestamp_ms(range_start, end_of_day=False)
+        to_ts = _to_timestamp_ms(range_end, end_of_day=True)
+        payload = coincap_client.get_asset_history(
+            crypto.coingecko_id, from_ts, to_ts, interval="d1"
         )
-        prices = payload.get("prices", [])
-        if prices:
+        data = payload.get("data", [])
+        if data:
             by_date: dict[date, Decimal] = {}
-            for timestamp_ms, price in prices:
-                dt = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).date()
+            for entry in data:
+                timestamp_ms = entry.get("time")
+                price = entry.get("priceUsd")
+                if timestamp_ms is None or price is None:
+                    continue
+                dt = datetime.fromtimestamp(
+                    timestamp_ms / 1000, tz=timezone.utc
+                ).date()
+                if dt < range_start or dt > range_end:
+                    continue
                 if dt in existing_dates:
                     continue
                 by_date[dt] = Decimal(str(price))
@@ -367,45 +360,183 @@ def backfill_historical_prices(
                 "to": range_end.isoformat(),
             }
         )
-        if idx < len(recent_ranges) - 1 and request_delay > 0:
-            time_module.sleep(request_delay)
-
-    if historical_ranges and coincap_client:
-        for idx, (range_start, range_end) in enumerate(historical_ranges):
-            from_ts = _to_timestamp_ms(range_start, end_of_day=False)
-            to_ts = _to_timestamp_ms(range_end, end_of_day=False)
-            payload = coincap_client.get_asset_history(
-                crypto.coingecko_id, from_ts, to_ts, interval="d1"
-            )
-            data = payload.get("data", [])
-            if data:
-                by_date: dict[date, Decimal] = {}
-                for entry in data:
-                    timestamp_ms = entry.get("time")
-                    price = entry.get("priceUsd")
-                    if timestamp_ms is None or price is None:
-                        continue
-                    dt = datetime.fromtimestamp(
-                        timestamp_ms / 1000, tz=timezone.utc
-                    ).date()
-                    if dt < range_start or dt > range_end:
-                        continue
-                    if dt in existing_dates:
-                        continue
-                    by_date[dt] = Decimal(str(price))
-                inserted_total += persist_prices(by_date)
-
-            requested += 1
-            ranges_info.append(
-                {
-                    "from": range_start.isoformat(),
-                    "to": range_end.isoformat(),
-                }
-            )
-            if idx < len(historical_ranges) - 1 and coincap_request_delay > 0:
-                time_module.sleep(coincap_request_delay)
+        if idx < len(request_ranges) - 1 and coincap_request_delay > 0:
+            time_module.sleep(coincap_request_delay)
 
     return {"inserted": inserted_total, "requested": requested, "ranges": ranges_info}
+
+
+def _load_missing_price_info(session, crypto_id: int) -> dict[str, Any]:
+    crypto = session.execute(
+        select(Cryptocurrency).where(Cryptocurrency.id == crypto_id)
+    ).scalar_one_or_none()
+    if not crypto:
+        raise ValueError("Crypto not found")
+
+    start_date = session.execute(
+        select(func.min(Price.date)).where(Price.crypto_id == crypto_id)
+    ).scalar_one_or_none()
+    end_date = session.execute(
+        select(func.max(Price.date)).where(Price.crypto_id == crypto_id)
+    ).scalar_one_or_none()
+    if not start_date or not end_date:
+        return {
+            "crypto": crypto,
+            "has_history": False,
+            "missing_ranges": [],
+            "missing_dates": [],
+            "existing_dates": set(),
+            "start_date": None,
+            "end_date": None,
+            "total_days": 0,
+            "stored_days": 0,
+        }
+
+    rows = session.execute(
+        select(Price.date)
+        .where(Price.crypto_id == crypto_id)
+        .where(Price.date >= start_date)
+        .where(Price.date <= end_date)
+    ).all()
+    existing_dates = {row[0] for row in rows}
+    missing_ranges = _compute_missing_ranges(start_date, end_date, existing_dates)
+    missing_dates: list[date] = []
+    for range_start, range_end in missing_ranges:
+        current = range_start
+        while current <= range_end:
+            missing_dates.append(current)
+            current += timedelta(days=1)
+
+    total_days = (end_date - start_date).days + 1
+    stored_days = len(existing_dates)
+
+    return {
+        "crypto": crypto,
+        "has_history": True,
+        "missing_ranges": missing_ranges,
+        "missing_dates": missing_dates,
+        "existing_dates": existing_dates,
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_days": total_days,
+        "stored_days": stored_days,
+    }
+
+
+def inspect_missing_prices(crypto_id: int) -> dict[str, Any]:
+    session = get_session()
+    info = _load_missing_price_info(session, crypto_id)
+    return {
+        "has_history": info["has_history"],
+        "missing_ranges": info["missing_ranges"],
+        "missing_dates": info["missing_dates"],
+        "start_date": info["start_date"],
+        "end_date": info["end_date"],
+        "total_days": info["total_days"],
+        "stored_days": info["stored_days"],
+    }
+
+
+def fill_missing_prices(
+    crypto_id: int,
+    vs_currency: str,
+    request_delay: float = 1.1,
+    max_request_days: int | None = None,
+    coincap_client: CoincapClient | None = None,
+    coincap_request_delay: float | None = None,
+) -> dict[str, Any]:
+    session = get_session()
+    info = _load_missing_price_info(session, crypto_id)
+    crypto = info["crypto"]
+    missing_ranges = info["missing_ranges"]
+    existing_dates = info["existing_dates"]
+    if not info["has_history"]:
+        return {"inserted": 0, "requested": 0, "ranges": [], "has_history": False}
+    if not missing_ranges:
+        return {"inserted": 0, "requested": 0, "ranges": [], "has_history": True}
+
+    if not coincap_client:
+        raise CoincapError("Coincap client required to verify history")
+    if vs_currency.lower() != "usd":
+        raise CoincapError("Coincap only supports USD historical prices")
+    if coincap_request_delay is None:
+        coincap_request_delay = request_delay
+
+    max_chunk_days = (
+        max_request_days if max_request_days is not None else MAX_BACKFILL_CHUNK_DAYS
+    )
+
+    request_ranges: list[tuple[date, date]] = []
+    for range_start, range_end in missing_ranges:
+        request_ranges.extend(
+            _split_date_range(range_start, range_end, max_chunk_days)
+        )
+
+    inserted_total = 0
+    requested = 0
+    ranges_info: list[dict[str, str]] = []
+
+    def persist_prices(by_date: dict[date, Decimal]) -> int:
+        if not by_date:
+            return 0
+        records = [
+            {"crypto_id": crypto.id, "date": day, "price": price}
+            for day, price in by_date.items()
+        ]
+        stmt = insert(Price).values(records)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[Price.crypto_id, Price.date],
+            set_={"price": stmt.excluded.price},
+        )
+        try:
+            session.execute(stmt)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        existing_dates.update(by_date.keys())
+        return len(records)
+
+    for idx, (range_start, range_end) in enumerate(request_ranges):
+        from_ts = _to_timestamp_ms(range_start, end_of_day=False)
+        to_ts = _to_timestamp_ms(range_end, end_of_day=True)
+        payload = coincap_client.get_asset_history(
+            crypto.coingecko_id, from_ts, to_ts, interval="d1"
+        )
+        data = payload.get("data", [])
+        if data:
+            by_date: dict[date, Decimal] = {}
+            for entry in data:
+                timestamp_ms = entry.get("time")
+                price = entry.get("priceUsd")
+                if timestamp_ms is None or price is None:
+                    continue
+                dt = datetime.fromtimestamp(
+                    timestamp_ms / 1000, tz=timezone.utc
+                ).date()
+                if dt < range_start or dt > range_end:
+                    continue
+                if dt in existing_dates:
+                    continue
+                by_date[dt] = Decimal(str(price))
+            inserted_total += persist_prices(by_date)
+
+        requested += 1
+        ranges_info.append(
+            {
+                "from": range_start.isoformat(),
+                "to": range_end.isoformat(),
+            }
+        )
+        if idx < len(request_ranges) - 1 and coincap_request_delay > 0:
+            time_module.sleep(coincap_request_delay)
+
+    return {
+        "inserted": inserted_total,
+        "requested": requested,
+        "ranges": ranges_info,
+        "has_history": True,
+    }
 
 
 def update_daily_prices(
