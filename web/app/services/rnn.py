@@ -93,9 +93,16 @@ def _extract_points(series) -> list[tuple[date, float]]:
     ]
 
 
-def _train_rnn(series, model_type: str, horizon_days: int, future_covariates=None):
+def _train_rnn(
+    series,
+    model_type: str,
+    horizon_days: int,
+    future_covariates=None,
+    n_rnn_layers: int = 1,
+    output_chunk_length: int = 1,
+):
     series_len = len(series)
-    output_chunk = 1
+    output_chunk = max(1, output_chunk_length)
     input_chunk = max(5, min(30, series_len // 4))
     if input_chunk + output_chunk > series_len:
         input_chunk = max(3, series_len - output_chunk)
@@ -111,6 +118,7 @@ def _train_rnn(series, model_type: str, horizon_days: int, future_covariates=Non
             EarlyStopping(monitor="train_loss", patience=10)
         ]
 
+    dropout = 0.1 if n_rnn_layers > 1 else 0.0
     model = RNNModel(
         model=model_type,
         input_chunk_length=input_chunk,
@@ -118,7 +126,8 @@ def _train_rnn(series, model_type: str, horizon_days: int, future_covariates=Non
         training_length=training_length,
         n_epochs=100,
         batch_size=32,
-        dropout=0.1,
+        dropout=dropout,
+        n_rnn_layers=n_rnn_layers,
         random_state=42,
         pl_trainer_kwargs=trainer_kwargs,
     )
@@ -127,7 +136,11 @@ def _train_rnn(series, model_type: str, horizon_days: int, future_covariates=Non
 
 
 def _compute_forecast(
-    rows: list[dict[str, Any]], model_type: str, horizon_days: int
+    rows: list[dict[str, Any]],
+    model_type: str,
+    horizon_days: int,
+    n_rnn_layers: int = 1,
+    output_chunk_length: int = 1,
 ) -> list[dict[str, Any]]:
     if TimeSeries is None or RNNModel is None:
         logger.warning("Darts no esta disponible; omitiendo forecast %s.", model_type)
@@ -146,13 +159,18 @@ def _compute_forecast(
     covariates = _build_covariates(rows, horizon_days)
 
     model, input_chunk = _train_rnn(
-        scaled_series, model_type, horizon_days, future_covariates=covariates
+        scaled_series,
+        model_type,
+        horizon_days,
+        future_covariates=covariates,
+        n_rnn_layers=n_rnn_layers,
+        output_chunk_length=output_chunk_length,
     )
     historical = model.historical_forecasts(
         scaled_series,
         future_covariates=covariates,
         start=input_chunk,
-        forecast_horizon=1,
+        forecast_horizon=max(1, output_chunk_length),
         stride=1,
         retrain=False,
     )
@@ -234,11 +252,19 @@ def _store_forecast(
     rows: list[dict[str, Any]],
     horizon_days: int,
     model_type: str,
+    n_rnn_layers: int = 1,
+    output_chunk_length: int = 1,
 ) -> int:
     if horizon_days <= 0 or len(rows) < 5:
         return 0
     cutoff_date = rows[-1]["date"]
-    forecast = _compute_forecast(rows, model_type, horizon_days)
+    forecast = _compute_forecast(
+        rows,
+        model_type,
+        horizon_days,
+        n_rnn_layers=n_rnn_layers,
+        output_chunk_length=output_chunk_length,
+    )
     if not forecast:
         return 0
 
@@ -264,15 +290,43 @@ def _store_forecast(
 
 
 def store_lstm_forecast(
-    session, crypto_id: int, rows: list[dict[str, Any]], horizon_days: int
+    session,
+    crypto_id: int,
+    rows: list[dict[str, Any]],
+    horizon_days: int,
+    n_rnn_layers: int = 1,
+    output_chunk_length: int = 1,
 ) -> int:
-    return _store_forecast(session, LstmForecast, crypto_id, rows, horizon_days, "LSTM")
+    return _store_forecast(
+        session,
+        LstmForecast,
+        crypto_id,
+        rows,
+        horizon_days,
+        "LSTM",
+        n_rnn_layers=n_rnn_layers,
+        output_chunk_length=output_chunk_length,
+    )
 
 
 def store_gru_forecast(
-    session, crypto_id: int, rows: list[dict[str, Any]], horizon_days: int
+    session,
+    crypto_id: int,
+    rows: list[dict[str, Any]],
+    horizon_days: int,
+    n_rnn_layers: int = 1,
+    output_chunk_length: int = 1,
 ) -> int:
-    return _store_forecast(session, GruForecast, crypto_id, rows, horizon_days, "GRU")
+    return _store_forecast(
+        session,
+        GruForecast,
+        crypto_id,
+        rows,
+        horizon_days,
+        "GRU",
+        n_rnn_layers=n_rnn_layers,
+        output_chunk_length=output_chunk_length,
+    )
 
 
 def _fetch_forecast(

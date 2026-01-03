@@ -59,9 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.appendChild(container);
     return container;
   };
-  const showToast = (message, variant = "info") => {
+  const showToast = (message, variant = "info", options = {}) => {
     if (!window.bootstrap || !bootstrap.Toast) {
-      return;
+      return null;
     }
     const toastContainer = getToastContainer();
     const toastEl = document.createElement("div");
@@ -76,13 +76,113 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
     toastContainer.appendChild(toastEl);
     const toast = new bootstrap.Toast(toastEl, {
-      autohide: true,
-      delay: 5000,
+      autohide: options.autohide !== false,
+      delay: options.delay ?? 5000,
     });
     toastEl.addEventListener("hidden.bs.toast", () => {
       toastEl.remove();
     });
     toast.show();
+    return { element: toastEl, toast };
+  };
+
+  const jobPollers = new Map();
+  const jobToasts = new Map();
+  const jobSpinnerHtml =
+    '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>';
+  const setFormControlsDisabled = (form, disabled) => {
+    form.querySelectorAll("input, select, textarea").forEach((control) => {
+      control.disabled = disabled;
+    });
+    form
+      .querySelectorAll("button[type='submit']")
+      .forEach((button) => {
+        button.disabled = disabled;
+      });
+  };
+  const setJobGroupDisabled = (group, disabled) => {
+    if (!group) {
+      return;
+    }
+    document.querySelectorAll(`[data-job-group='${group}']`).forEach((el) => {
+      if (el.tagName === "FORM") {
+        setFormControlsDisabled(el, disabled);
+        return;
+      }
+      if ("disabled" in el) {
+        el.disabled = disabled;
+      }
+    });
+  };
+  const getStatusUrlForType = (jobType) => {
+    const form = document.querySelector(
+      `form[data-job-type='${jobType}'][data-job-status-url]`,
+    );
+    return form ? form.dataset.jobStatusUrl : "";
+  };
+  const stopJobPolling = (jobType) => {
+    const poller = jobPollers.get(jobType);
+    if (poller) {
+      clearInterval(poller);
+      jobPollers.delete(jobType);
+    }
+    const toast = jobToasts.get(jobType);
+    if (toast && toast.toast) {
+      toast.toast.hide();
+    }
+    jobToasts.delete(jobType);
+  };
+  const startJobPolling = ({
+    jobType,
+    statusUrl,
+    runningMessage,
+    doneMessage,
+    errorMessage,
+    jobGroup,
+  }) => {
+    if (!jobType || !statusUrl || jobPollers.has(jobType)) {
+      return;
+    }
+    const toast = showToast(`${jobSpinnerHtml}${runningMessage}`, "info", {
+      autohide: false,
+    });
+    if (toast) {
+      jobToasts.set(jobType, toast);
+    }
+    setJobGroupDisabled(jobGroup, true);
+
+    const poll = async () => {
+      try {
+        const response = await fetch(statusUrl, {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) {
+          return;
+        }
+        const payload = await response.json();
+        if (!payload || payload.state === "running") {
+          return;
+        }
+        stopJobPolling(jobType);
+        if (payload.state === "done") {
+          showToast(payload.message || doneMessage, "success");
+          window.location.reload();
+          return;
+        }
+        if (payload.state === "error") {
+          showToast(payload.message || errorMessage, "danger");
+        }
+        setJobGroupDisabled(jobGroup, false);
+      } catch (error) {
+        stopJobPolling(jobType);
+        showToast(errorMessage, "danger");
+        setJobGroupDisabled(jobGroup, false);
+      }
+    };
+
+    const interval = setInterval(poll, 3000);
+    jobPollers.set(jobType, interval);
+    poll();
   };
 
   document.querySelectorAll("form[data-loading='1']").forEach((form) => {
@@ -98,27 +198,66 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       setFormLoading(form, true);
-      const message =
-        form.dataset.asyncMessage ||
-        "Calculations are running in the background.";
-      showToast(message, form.dataset.asyncVariant || "info");
       try {
         const response = await fetch(form.action, {
           method: form.method || "POST",
           body: new FormData(form),
+          headers: { Accept: "application/json" },
         });
         if (!response.ok) {
           showToast("Update failed. Refresh and try again.", "danger");
           setFormLoading(form, false);
           return;
         }
+        const payload = await response.json().catch(() => null);
+        if (!payload || !payload.state) {
+          window.location.reload();
+          return;
+        }
+        setFormLoading(form, false);
+        const jobType = payload.job_type || form.dataset.jobType;
+        const jobGroup = form.dataset.jobGroup;
+        const runningMessage =
+          form.dataset.asyncMessage ||
+          "Calculations are running in the background.";
         const doneMessage =
           form.dataset.asyncDoneMessage || "Done. Refreshing chart.";
-        writePendingToast({
-          message: doneMessage,
-          variant: form.dataset.asyncDoneVariant || "success",
+        const errorMessage =
+          form.dataset.asyncErrorMessage || "Update failed. Refresh and try again.";
+        if (payload.state === "busy") {
+          showToast(payload.message || "Update already running.", "warning");
+          const activeType = payload.active_job_type;
+          const activeStatusUrl = getStatusUrlForType(activeType);
+          if (activeType && activeStatusUrl) {
+            startJobPolling({
+              jobType: activeType,
+              statusUrl: activeStatusUrl,
+              runningMessage: `${payload.active_label || activeType} update running.`,
+              doneMessage,
+              errorMessage,
+              jobGroup,
+            });
+          }
+          return;
+        }
+        if (payload.state === "error") {
+          showToast(payload.message || errorMessage, "danger");
+          setJobGroupDisabled(jobGroup, false);
+          return;
+        }
+        if (payload.state === "done") {
+          showToast(payload.message || doneMessage, "success");
+          window.location.reload();
+          return;
+        }
+        startJobPolling({
+          jobType,
+          statusUrl: form.dataset.jobStatusUrl,
+          runningMessage,
+          doneMessage,
+          errorMessage,
+          jobGroup,
         });
-        window.location.reload();
       } catch (error) {
         showToast("Update failed. Refresh and try again.", "danger");
         setFormLoading(form, false);
@@ -146,6 +285,45 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast(pendingToast.message, pendingToast.variant || "info");
     clearPendingToast();
   }
+
+  const jobForms = document.querySelectorAll(
+    "form[data-job-type][data-job-status-url]",
+  );
+  const seenJobTypes = new Set();
+  jobForms.forEach((form) => {
+    const jobType = form.dataset.jobType;
+    if (!jobType || seenJobTypes.has(jobType)) {
+      return;
+    }
+    seenJobTypes.add(jobType);
+    const statusUrl = form.dataset.jobStatusUrl;
+    if (!statusUrl) {
+      return;
+    }
+    fetch(statusUrl, { headers: { Accept: "application/json" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!payload || payload.state !== "running") {
+          return;
+        }
+        const runningMessage =
+          form.dataset.asyncMessage ||
+          "Calculations are running in the background.";
+        const doneMessage =
+          form.dataset.asyncDoneMessage || "Done. Refreshing chart.";
+        const errorMessage =
+          form.dataset.asyncErrorMessage || "Update failed. Refresh and try again.";
+        startJobPolling({
+          jobType,
+          statusUrl,
+          runningMessage,
+          doneMessage,
+          errorMessage,
+          jobGroup: form.dataset.jobGroup,
+        });
+      })
+      .catch(() => {});
+  });
 
   document.querySelectorAll("form[data-validate='1']").forEach((form) => {
     form.addEventListener("submit", (event) => {

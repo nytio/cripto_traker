@@ -75,7 +75,7 @@
     <div class="modal-dialog">
       <div class="modal-content">
         {% set prophet_days = days if days in [0,1825,1095,730,365] else 365 %}
-        <form method="post" action="{{ url_for('charts.recalculate_prophet', crypto_id=crypto.id) }}" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
+        <form method="post" action="{{ url_for('charts.recalculate_prophet', crypto_id=crypto.id) }}" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done." data-job-type="prophet" data-job-group="forecast" data-job-label="Prophet" data-job-status-url="{{ url_for('charts.job_status', crypto_id=crypto.id, job_type='prophet') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="range_days" value="{{ days }}">
           <div class="modal-header">
@@ -91,6 +91,102 @@
               <option value="730" {% if prophet_days == 730 %}selected{% endif %}>2 years</option>
               <option value="365" {% if prophet_days == 365 %}selected{% endif %}>1 year</option>
             </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" data-loading-text="Calculando...">Update</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="lstm-modal" tabindex="-1" aria-labelledby="lstm-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        {% set lstm_days = days if days in [0,1825,1095,730,365] else 365 %}
+        <form method="post" action="{{ url_for('charts.recalculate_lstm', crypto_id=crypto.id) }}" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done." data-job-type="lstm" data-job-group="forecast" data-job-label="LSTM" data-job-status-url="{{ url_for('charts.job_status', crypto_id=crypto.id, job_type='lstm') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="range_days" value="{{ days }}">
+          <div class="modal-header">
+            <h5 class="modal-title" id="lstm-modal-label">Update LSTM</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            {% set lstm_layers = 1 %}
+            {% set lstm_output_chunk = 1 %}
+            <label for="lstm-days" class="form-label">LSTM range</label>
+            <select class="form-select" id="lstm-days" name="lstm_days">
+              <option value="0" {% if lstm_days == 0 %}selected{% endif %}>All</option>
+              <option value="1825" {% if lstm_days == 1825 %}selected{% endif %}>5 years</option>
+              <option value="1095" {% if lstm_days == 1095 %}selected{% endif %}>3 years</option>
+              <option value="730" {% if lstm_days == 730 %}selected{% endif %}>2 years</option>
+              <option value="365" {% if lstm_days == 365 %}selected{% endif %}>1 year</option>
+            </select>
+            <div class="mt-3">
+              <label for="lstm-layers" class="form-label">LSTM layers</label>
+              <select class="form-select" id="lstm-layers" name="lstm_layers">
+                <option value="1" {% if lstm_layers == 1 %}selected{% endif %}>1 layer</option>
+                <option value="2" {% if lstm_layers == 2 %}selected{% endif %}>2 layers</option>
+                <option value="3" {% if lstm_layers == 3 %}selected{% endif %}>3 layers</option>
+              </select>
+            </div>
+            <div class="mt-3">
+              <label for="lstm-output-chunk" class="form-label">Output chunk length</label>
+              <select class="form-select" id="lstm-output-chunk" name="lstm_output_chunk">
+                <option value="1" {% if lstm_output_chunk == 1 %}selected{% endif %}>1 step</option>
+                <option value="2" {% if lstm_output_chunk == 2 %}selected{% endif %}>2 steps</option>
+                <option value="3" {% if lstm_output_chunk == 3 %}selected{% endif %}>3 steps</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" data-loading-text="Calculando...">Update</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="gru-modal" tabindex="-1" aria-labelledby="gru-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        {% set gru_days = days if days in [0,1825,1095,730,365] else 365 %}
+        <form method="post" action="{{ url_for('charts.recalculate_gru', crypto_id=crypto.id) }}" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done." data-job-type="gru" data-job-group="forecast" data-job-label="GRU" data-job-status-url="{{ url_for('charts.job_status', crypto_id=crypto.id, job_type='gru') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="range_days" value="{{ days }}">
+          <div class="modal-header">
+            <h5 class="modal-title" id="gru-modal-label">Update GRU</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            {% set gru_layers = 1 %}
+            {% set gru_output_chunk = 1 %}
+            <label for="gru-days" class="form-label">GRU range</label>
+            <select class="form-select" id="gru-days" name="gru_days">
+              <option value="0" {% if gru_days == 0 %}selected{% endif %}>All</option>
+              <option value="1825" {% if gru_days == 1825 %}selected{% endif %}>5 years</option>
+              <option value="1095" {% if gru_days == 1095 %}selected{% endif %}>3 years</option>
+              <option value="730" {% if gru_days == 730 %}selected{% endif %}>2 years</option>
+              <option value="365" {% if gru_days == 365 %}selected{% endif %}>1 year</option>
+            </select>
+            <div class="mt-3">
+              <label for="gru-layers" class="form-label">GRU layers</label>
+              <select class="form-select" id="gru-layers" name="gru_layers">
+                <option value="1" {% if gru_layers == 1 %}selected{% endif %}>1 layer</option>
+                <option value="2" {% if gru_layers == 2 %}selected{% endif %}>2 layers</option>
+                <option value="3" {% if gru_layers == 3 %}selected{% endif %}>3 layers</option>
+              </select>
+            </div>
+            <div class="mt-3">
+              <label for="gru-output-chunk" class="form-label">Output chunk length</label>
+              <select class="form-select" id="gru-output-chunk" name="gru_output_chunk">
+                <option value="1" {% if gru_output_chunk == 1 %}selected{% endif %}>1 step</option>
+                <option value="2" {% if gru_output_chunk == 2 %}selected{% endif %}>2 steps</option>
+                <option value="3" {% if gru_output_chunk == 3 %}selected{% endif %}>3 steps</option>
+              </select>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -134,7 +230,7 @@
                 <input class="form-check-input" type="checkbox" value="Prophet" id="toggle-prophet">
                 <label class="form-check-label" for="toggle-prophet">Prophet</label>
               </div>
-              <button class="btn btn-sm btn-outline-secondary ct-toolbar-action" type="button" data-bs-toggle="modal" data-bs-target="#prophet-modal">
+              <button class="btn btn-sm btn-outline-secondary ct-toolbar-action" type="button" data-bs-toggle="modal" data-bs-target="#prophet-modal" data-job-type="prophet" data-job-group="forecast">
                 Update
               </button>
             </div>
@@ -143,22 +239,18 @@
                 <input class="form-check-input" type="checkbox" value="LSTM" id="toggle-lstm">
                 <label class="form-check-label" for="toggle-lstm">LSTM</label>
               </div>
-              <form method="post" action="{{ url_for('charts.recalculate_lstm', crypto_id=crypto.id) }}" class="ct-toolbar-form" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="range_days" value="{{ days }}">
-                <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-action" data-loading-text="Calculando...">Update</button>
-              </form>
+              <button class="btn btn-sm btn-outline-secondary ct-toolbar-action" type="button" data-bs-toggle="modal" data-bs-target="#lstm-modal" data-job-type="lstm" data-job-group="forecast">
+                Update
+              </button>
             </div>
             <div class="ct-toolbar-group">
               <div class="form-check ct-chip">
                 <input class="form-check-input" type="checkbox" value="GRU" id="toggle-gru">
                 <label class="form-check-label" for="toggle-gru">GRU</label>
               </div>
-              <form method="post" action="{{ url_for('charts.recalculate_gru', crypto_id=crypto.id) }}" class="ct-toolbar-form" data-loading="1" data-async="1" data-async-message="Calculations are running in the background." data-async-done-message="Done.">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="range_days" value="{{ days }}">
-                <button type="submit" class="btn btn-sm btn-outline-secondary ct-toolbar-action" data-loading-text="Calculando...">Update</button>
-              </form>
+              <button class="btn btn-sm btn-outline-secondary ct-toolbar-action" type="button" data-bs-toggle="modal" data-bs-target="#gru-modal" data-job-type="gru" data-job-group="forecast">
+                Update
+              </button>
             </div>
             <form method="get" class="d-flex align-items-center gap-2 ms-auto" id="range-form">
               <label for="days" class="form-label mb-0 text-muted small">Range</label>
