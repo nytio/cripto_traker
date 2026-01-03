@@ -10,3 +10,4 @@ pandas==2.1.4
 prophet==1.1.5
 torch==2.2.2
 darts==0.28.0
+plotly==5.22.0

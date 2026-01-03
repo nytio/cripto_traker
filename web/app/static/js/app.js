@@ -286,6 +286,28 @@ document.addEventListener("DOMContentLoaded", () => {
     clearPendingToast();
   }
 
+  const toggleRnnModelFields = (select) => {
+    const form = select.closest("form");
+    if (!form) {
+      return;
+    }
+    const model = select.value;
+    form.querySelectorAll("[data-rnn-model]").forEach((section) => {
+      const isActive = section.dataset.rnnModel === model;
+      section.hidden = !isActive;
+      section.querySelectorAll("input, select, textarea").forEach((input) => {
+        input.disabled = !isActive;
+      });
+    });
+  };
+
+  document
+    .querySelectorAll("[data-rnn-model-select='1']")
+    .forEach((select) => {
+      toggleRnnModelFields(select);
+      select.addEventListener("change", () => toggleRnnModelFields(select));
+    });
+
   const jobForms = document.querySelectorAll(
     "form[data-job-type][data-job-status-url]",
   );

@@ -91,6 +91,53 @@ def _parse_int(
     return parsed
 
 
+def _parse_int_range(
+    value: str | None, default: int, min_value: int, max_value: int | None = None
+) -> int:
+    if not value:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        return default
+    if parsed < min_value:
+        return min_value
+    if max_value is not None and parsed > max_value:
+        return max_value
+    return parsed
+
+
+def _parse_choice(value: str | None, allowed: set[str], default: str) -> str:
+    if value in allowed:
+        return value
+    return default
+
+
+def _parse_int_list(
+    value: str | None,
+    default: list[int],
+    min_value: int = 1,
+    max_value: int = 512,
+) -> list[int]:
+    if not value:
+        return list(default)
+    items = []
+    for part in value.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        try:
+            parsed = int(token)
+        except ValueError:
+            continue
+        if parsed < min_value:
+            parsed = min_value
+        if parsed > max_value:
+            parsed = max_value
+        items.append(parsed)
+    return items or list(default)
+
+
 @bp.get("/cryptos/<int:crypto_id>")
 def crypto_detail(crypto_id: int):
     session = get_session()
@@ -228,15 +275,50 @@ def recalculate_lstm(crypto_id: int):
     max_days = current_app.config["MAX_HISTORY_DAYS"]
     lstm_days_raw = request.form.get("lstm_days", "").strip()
     lstm_days = clamp_days(lstm_days_raw, max_days)
-    lstm_layers = _parse_int(
-        request.form.get("lstm_layers"),
-        1,
-        allowed={1, 2, 3},
+    lstm_model_kind = _parse_choice(
+        request.form.get("lstm_model"), {"rnn", "block"}, "rnn"
     )
-    lstm_output_chunk = _parse_int(
+    lstm_input_default = 180
+    lstm_input_chunk = _parse_int_range(
+        request.form.get("lstm_input_chunk"),
+        lstm_input_default,
+        min_value=5,
+        max_value=max_days,
+    )
+    lstm_layers_default = 2
+    lstm_layers = _parse_int_range(
+        request.form.get("lstm_layers"),
+        lstm_layers_default,
+        min_value=1,
+        max_value=4,
+    )
+    lstm_training_default = lstm_input_chunk + horizon_days
+    lstm_training_length = _parse_int_range(
+        request.form.get("lstm_training_length"),
+        lstm_training_default,
+        min_value=10,
+        max_value=max_days,
+    )
+    if lstm_model_kind == "rnn" and lstm_training_length <= lstm_input_chunk:
+        lstm_training_length = min(
+            max_days, lstm_input_chunk + max(1, horizon_days)
+        )
+    lstm_output_default = 1 if lstm_model_kind == "rnn" else 30
+    lstm_output_chunk = _parse_int_range(
         request.form.get("lstm_output_chunk"),
-        1,
-        allowed={1, 2, 3},
+        lstm_output_default,
+        min_value=1,
+        max_value=max_days,
+    )
+    lstm_hidden_dim = _parse_int_range(
+        request.form.get("lstm_hidden_dim"),
+        64,
+        min_value=8,
+        max_value=512,
+    )
+    lstm_hidden_fc_sizes = _parse_int_list(
+        request.form.get("lstm_hidden_fc_sizes"),
+        [64, 32],
     )
     job_key = _job_key(job_type, crypto_id)
 
@@ -251,8 +333,13 @@ def recalculate_lstm(crypto_id: int):
                 crypto_id,
                 rows,
                 horizon_days,
+                model_kind=lstm_model_kind,
+                input_chunk_length=lstm_input_chunk,
+                training_length=lstm_training_length,
                 n_rnn_layers=lstm_layers,
                 output_chunk_length=lstm_output_chunk,
+                hidden_dim=lstm_hidden_dim,
+                hidden_fc_sizes=lstm_hidden_fc_sizes,
             )
             if not stored:
                 raise RuntimeError("LSTM forecast not available")
@@ -290,15 +377,50 @@ def recalculate_gru(crypto_id: int):
     max_days = current_app.config["MAX_HISTORY_DAYS"]
     gru_days_raw = request.form.get("gru_days", "").strip()
     gru_days = clamp_days(gru_days_raw, max_days)
-    gru_layers = _parse_int(
-        request.form.get("gru_layers"),
-        1,
-        allowed={1, 2, 3},
+    gru_model_kind = _parse_choice(
+        request.form.get("gru_model"), {"rnn", "block"}, "rnn"
     )
-    gru_output_chunk = _parse_int(
+    gru_input_default = 180
+    gru_input_chunk = _parse_int_range(
+        request.form.get("gru_input_chunk"),
+        gru_input_default,
+        min_value=5,
+        max_value=max_days,
+    )
+    gru_layers_default = 2
+    gru_layers = _parse_int_range(
+        request.form.get("gru_layers"),
+        gru_layers_default,
+        min_value=1,
+        max_value=4,
+    )
+    gru_training_default = gru_input_chunk + horizon_days
+    gru_training_length = _parse_int_range(
+        request.form.get("gru_training_length"),
+        gru_training_default,
+        min_value=10,
+        max_value=max_days,
+    )
+    if gru_model_kind == "rnn" and gru_training_length <= gru_input_chunk:
+        gru_training_length = min(
+            max_days, gru_input_chunk + max(1, horizon_days)
+        )
+    gru_output_default = 1 if gru_model_kind == "rnn" else 30
+    gru_output_chunk = _parse_int_range(
         request.form.get("gru_output_chunk"),
-        1,
-        allowed={1, 2, 3},
+        gru_output_default,
+        min_value=1,
+        max_value=max_days,
+    )
+    gru_hidden_dim = _parse_int_range(
+        request.form.get("gru_hidden_dim"),
+        64,
+        min_value=8,
+        max_value=512,
+    )
+    gru_hidden_fc_sizes = _parse_int_list(
+        request.form.get("gru_hidden_fc_sizes"),
+        [64, 32],
     )
     job_key = _job_key(job_type, crypto_id)
 
@@ -313,8 +435,13 @@ def recalculate_gru(crypto_id: int):
                 crypto_id,
                 rows,
                 horizon_days,
+                model_kind=gru_model_kind,
+                input_chunk_length=gru_input_chunk,
+                training_length=gru_training_length,
                 n_rnn_layers=gru_layers,
                 output_chunk_length=gru_output_chunk,
+                hidden_dim=gru_hidden_dim,
+                hidden_fc_sizes=gru_hidden_fc_sizes,
             )
             if not stored:
                 raise RuntimeError("GRU forecast not available")

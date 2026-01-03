@@ -15,11 +15,14 @@ from ..models import GruForecast, LstmForecast
 try:
     from darts import TimeSeries
     from darts.dataprocessing.transformers import Scaler
-    from darts.models import RNNModel
+    from darts.models import BlockRNNModel, RNNModel
+    import torch
     from pytorch_lightning.callbacks import EarlyStopping
 except ImportError:  # pragma: no cover - optional dependency fallback
     TimeSeries = None
     RNNModel = None
+    BlockRNNModel = None
+    torch = None
     Scaler = None
     EarlyStopping = None
 
@@ -85,6 +88,24 @@ def _build_covariates(rows: list[dict[str, Any]], horizon_days: int):
     )
 
 
+def _covariate_kwargs(model, covariates) -> dict[str, Any]:
+    if covariates is None:
+        return {}
+    supports_future = bool(
+        getattr(model, "supports_future_covariates", False)
+    )
+    supports_past = bool(getattr(model, "supports_past_covariates", False))
+    if supports_future and not supports_past:
+        return {"future_covariates": covariates}
+    if supports_past and not supports_future:
+        return {"past_covariates": covariates}
+    if supports_future:
+        return {"future_covariates": covariates}
+    if supports_past:
+        return {"past_covariates": covariates}
+    return {}
+
+
 def _extract_points(series) -> list[tuple[date, float]]:
     values = series.values().reshape(-1)
     dates = series.time_index
@@ -93,20 +114,50 @@ def _extract_points(series) -> list[tuple[date, float]]:
     ]
 
 
+def _resolve_chunk_lengths(
+    series_len: int, input_chunk_length: int, output_chunk_length: int
+) -> tuple[int, int]:
+    min_input = 5
+    output_chunk = max(1, output_chunk_length)
+    if series_len - output_chunk < min_input:
+        output_chunk = max(1, series_len - min_input)
+    input_chunk = min(input_chunk_length, series_len - output_chunk)
+    input_chunk = max(min_input, input_chunk)
+    if input_chunk + output_chunk > series_len:
+        input_chunk = max(3, series_len - output_chunk)
+    return input_chunk, output_chunk
+
+
+def _resolve_training_length(
+    series_len: int, input_chunk: int, training_length: int
+) -> int:
+    return max(input_chunk, min(training_length, series_len))
+
+
 def _train_rnn(
     series,
     model_type: str,
     horizon_days: int,
-    future_covariates=None,
-    n_rnn_layers: int = 1,
-    output_chunk_length: int = 1,
+    covariates=None,
+    model_kind: str = "rnn",
+    input_chunk_length: int = 180,
+    training_length: int = 210,
+    output_chunk_length: int = 30,
+    hidden_dim: int = 64,
+    n_rnn_layers: int = 2,
+    hidden_fc_sizes: list[int] | None = None,
 ):
     series_len = len(series)
-    output_chunk = max(1, output_chunk_length)
-    input_chunk = max(5, min(30, series_len // 4))
-    if input_chunk + output_chunk > series_len:
-        input_chunk = max(3, series_len - output_chunk)
-    training_length = min(series_len, input_chunk * 2)
+    output_chunk = 1 if model_kind == "rnn" else max(1, output_chunk_length)
+    input_chunk, output_chunk = _resolve_chunk_lengths(
+        series_len, input_chunk_length, output_chunk
+    )
+    if model_kind == "rnn":
+        training_length = _resolve_training_length(
+            series_len, input_chunk, training_length
+        )
+        if training_length <= input_chunk:
+            training_length = min(series_len, input_chunk + max(1, horizon_days))
 
     trainer_kwargs = {
         "accelerator": "cpu",
@@ -119,30 +170,69 @@ def _train_rnn(
         ]
 
     dropout = 0.1 if n_rnn_layers > 1 else 0.0
-    model = RNNModel(
-        model=model_type,
-        input_chunk_length=input_chunk,
-        output_chunk_length=output_chunk,
-        training_length=training_length,
-        n_epochs=100,
-        batch_size=32,
-        dropout=dropout,
-        n_rnn_layers=n_rnn_layers,
-        random_state=42,
-        pl_trainer_kwargs=trainer_kwargs,
-    )
-    model.fit(series, future_covariates=future_covariates, verbose=False)
-    return model, input_chunk
+    n_epochs = 200
+    batch_size = 64
+    model_kwargs = {
+        "model": model_type,
+        "input_chunk_length": input_chunk,
+        "n_epochs": n_epochs,
+        "batch_size": batch_size,
+        "dropout": dropout,
+        "n_rnn_layers": n_rnn_layers,
+        "random_state": 42,
+        "pl_trainer_kwargs": trainer_kwargs,
+    }
+    if torch is not None:
+        model_kwargs["loss_fn"] = torch.nn.SmoothL1Loss()
+        model_kwargs["optimizer_kwargs"] = {
+            "lr": 1e-3,
+            "weight_decay": 1e-6,
+        }
+        model_kwargs["lr_scheduler_cls"] = (
+            torch.optim.lr_scheduler.ReduceLROnPlateau
+        )
+        model_kwargs["lr_scheduler_kwargs"] = {
+            "factor": 0.5,
+            "patience": 10,
+            "min_lr": 1e-5,
+            "monitor": "train_loss",
+        }
+
+    if model_kind == "block":
+        if BlockRNNModel is None:
+            logger.warning("BlockRNNModel no esta disponible; omitiendo.")
+            return None, None, None
+        model = BlockRNNModel(
+            output_chunk_length=output_chunk,
+            hidden_fc_sizes=hidden_fc_sizes,
+            hidden_dim=hidden_dim,
+            **model_kwargs,
+        )
+    else:
+        model = RNNModel(
+            training_length=training_length,
+            hidden_dim=hidden_dim,
+            **model_kwargs,
+        )
+    model.fit(series, **_covariate_kwargs(model, covariates), verbose=False)
+    return model, input_chunk, output_chunk
 
 
 def _compute_forecast(
     rows: list[dict[str, Any]],
     model_type: str,
     horizon_days: int,
-    n_rnn_layers: int = 1,
-    output_chunk_length: int = 1,
+    model_kind: str = "rnn",
+    input_chunk_length: int = 180,
+    training_length: int = 210,
+    n_rnn_layers: int = 2,
+    output_chunk_length: int = 30,
+    hidden_dim: int = 64,
+    hidden_fc_sizes: list[int] | None = None,
 ) -> list[dict[str, Any]]:
-    if TimeSeries is None or RNNModel is None:
+    if TimeSeries is None or (
+        model_kind == "block" and BlockRNNModel is None
+    ) or (model_kind == "rnn" and RNNModel is None):
         logger.warning("Darts no esta disponible; omitiendo forecast %s.", model_type)
         return []
     if horizon_days <= 0 or len(rows) < 5:
@@ -158,19 +248,27 @@ def _compute_forecast(
     scaled_series = scaler.fit_transform(series) if scaler else series
     covariates = _build_covariates(rows, horizon_days)
 
-    model, input_chunk = _train_rnn(
+    model, input_chunk, output_chunk = _train_rnn(
         scaled_series,
         model_type,
         horizon_days,
-        future_covariates=covariates,
+        covariates=covariates,
+        model_kind=model_kind,
+        input_chunk_length=input_chunk_length,
+        training_length=training_length,
         n_rnn_layers=n_rnn_layers,
         output_chunk_length=output_chunk_length,
+        hidden_dim=hidden_dim,
+        hidden_fc_sizes=hidden_fc_sizes,
     )
+    if model is None:
+        return []
+    forecast_horizon = 1 if model_kind == "rnn" else max(1, output_chunk)
     historical = model.historical_forecasts(
         scaled_series,
-        future_covariates=covariates,
+        **_covariate_kwargs(model, covariates),
         start=input_chunk,
-        forecast_horizon=max(1, output_chunk_length),
+        forecast_horizon=forecast_horizon,
         stride=1,
         retrain=False,
     )
@@ -191,7 +289,9 @@ def _compute_forecast(
     sigma = float(np.std(residuals)) if residuals else 0.0
     ci_width = 1.96 * sigma
 
-    future = model.predict(horizon_days, future_covariates=covariates)
+    future = model.predict(
+        horizon_days, **_covariate_kwargs(model, covariates)
+    )
     adjusted_future = scaler.inverse_transform(future) if scaler else future
     future_points = _extract_points(adjusted_future)
 
@@ -252,8 +352,13 @@ def _store_forecast(
     rows: list[dict[str, Any]],
     horizon_days: int,
     model_type: str,
-    n_rnn_layers: int = 1,
-    output_chunk_length: int = 1,
+    model_kind: str = "rnn",
+    input_chunk_length: int = 180,
+    training_length: int = 210,
+    n_rnn_layers: int = 2,
+    output_chunk_length: int = 30,
+    hidden_dim: int = 64,
+    hidden_fc_sizes: list[int] | None = None,
 ) -> int:
     if horizon_days <= 0 or len(rows) < 5:
         return 0
@@ -262,8 +367,13 @@ def _store_forecast(
         rows,
         model_type,
         horizon_days,
+        model_kind=model_kind,
+        input_chunk_length=input_chunk_length,
+        training_length=training_length,
         n_rnn_layers=n_rnn_layers,
         output_chunk_length=output_chunk_length,
+        hidden_dim=hidden_dim,
+        hidden_fc_sizes=hidden_fc_sizes,
     )
     if not forecast:
         return 0
@@ -294,8 +404,13 @@ def store_lstm_forecast(
     crypto_id: int,
     rows: list[dict[str, Any]],
     horizon_days: int,
-    n_rnn_layers: int = 1,
-    output_chunk_length: int = 1,
+    model_kind: str = "rnn",
+    input_chunk_length: int = 180,
+    training_length: int = 210,
+    n_rnn_layers: int = 2,
+    output_chunk_length: int = 30,
+    hidden_dim: int = 64,
+    hidden_fc_sizes: list[int] | None = None,
 ) -> int:
     return _store_forecast(
         session,
@@ -304,8 +419,13 @@ def store_lstm_forecast(
         rows,
         horizon_days,
         "LSTM",
+        model_kind=model_kind,
+        input_chunk_length=input_chunk_length,
+        training_length=training_length,
         n_rnn_layers=n_rnn_layers,
         output_chunk_length=output_chunk_length,
+        hidden_dim=hidden_dim,
+        hidden_fc_sizes=hidden_fc_sizes,
     )
 
 
@@ -314,8 +434,13 @@ def store_gru_forecast(
     crypto_id: int,
     rows: list[dict[str, Any]],
     horizon_days: int,
-    n_rnn_layers: int = 1,
-    output_chunk_length: int = 1,
+    model_kind: str = "rnn",
+    input_chunk_length: int = 180,
+    training_length: int = 210,
+    n_rnn_layers: int = 2,
+    output_chunk_length: int = 30,
+    hidden_dim: int = 64,
+    hidden_fc_sizes: list[int] | None = None,
 ) -> int:
     return _store_forecast(
         session,
@@ -324,8 +449,13 @@ def store_gru_forecast(
         rows,
         horizon_days,
         "GRU",
+        model_kind=model_kind,
+        input_chunk_length=input_chunk_length,
+        training_length=training_length,
         n_rnn_layers=n_rnn_layers,
         output_chunk_length=output_chunk_length,
+        hidden_dim=hidden_dim,
+        hidden_fc_sizes=hidden_fc_sizes,
     )
 
 

@@ -113,8 +113,15 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            {% set lstm_layers = 1 %}
-            {% set lstm_output_chunk = 1 %}
+            {% set lstm_layers_rnn = 2 %}
+            {% set lstm_layers_block = 2 %}
+            {% set lstm_output_chunk = 30 %}
+            {% set lstm_input_chunk_rnn = 180 %}
+            {% set lstm_input_chunk_block = 180 %}
+            {% set lstm_training_length = 210 %}
+            {% set lstm_hidden_dim_rnn = 64 %}
+            {% set lstm_hidden_dim_block = 64 %}
+            {% set lstm_hidden_fc_sizes = "64, 32" %}
             <label for="lstm-days" class="form-label">LSTM range</label>
             <select class="form-select" id="lstm-days" name="lstm_days">
               <option value="0" {% if lstm_days == 0 %}selected{% endif %}>All</option>
@@ -124,20 +131,90 @@
               <option value="365" {% if lstm_days == 365 %}selected{% endif %}>1 year</option>
             </select>
             <div class="mt-3">
-              <label for="lstm-layers" class="form-label">LSTM layers</label>
-              <select class="form-select" id="lstm-layers" name="lstm_layers">
-                <option value="1" {% if lstm_layers == 1 %}selected{% endif %}>1 layer</option>
-                <option value="2" {% if lstm_layers == 2 %}selected{% endif %}>2 layers</option>
-                <option value="3" {% if lstm_layers == 3 %}selected{% endif %}>3 layers</option>
+              <label for="lstm-model" class="form-label">Model type</label>
+              <select class="form-select" id="lstm-model" name="lstm_model" data-rnn-model-select="1">
+                <option value="rnn" selected>RNNModel (1-step)</option>
+                <option value="block">BlockRNNModel (multi-step)</option>
               </select>
+              <div class="form-text">
+                RNNModel steps forward iteratively and needs future covariates; BlockRNNModel predicts the full block.
+              </div>
             </div>
-            <div class="mt-3">
-              <label for="lstm-output-chunk" class="form-label">Output chunk length</label>
-              <select class="form-select" id="lstm-output-chunk" name="lstm_output_chunk">
-                <option value="1" {% if lstm_output_chunk == 1 %}selected{% endif %}>1 step</option>
-                <option value="2" {% if lstm_output_chunk == 2 %}selected{% endif %}>2 steps</option>
-                <option value="3" {% if lstm_output_chunk == 3 %}selected{% endif %}>3 steps</option>
-              </select>
+            <div class="mt-3" data-rnn-model="rnn">
+              <div class="row g-2">
+                <div class="col-6">
+                  <label for="lstm-input-chunk" class="form-label">Input chunk</label>
+                  <input type="number" class="form-control" id="lstm-input-chunk" name="lstm_input_chunk" min="5" max="{{ max_days }}" value="{{ lstm_input_chunk_rnn }}">
+                </div>
+                <div class="col-6">
+                  <label for="lstm-training-length" class="form-label">Training length</label>
+                  <input type="number" class="form-control" id="lstm-training-length" name="lstm_training_length" min="10" max="{{ max_days }}" value="{{ lstm_training_length }}">
+                </div>
+              </div>
+              <div class="mt-2">
+                <label for="lstm-layers" class="form-label">RNN layers</label>
+                <select class="form-select" id="lstm-layers" name="lstm_layers">
+                  <option value="1" {% if lstm_layers_rnn == 1 %}selected{% endif %}>1 layer</option>
+                  <option value="2" {% if lstm_layers_rnn == 2 %}selected{% endif %}>2 layers</option>
+                  <option value="3" {% if lstm_layers_rnn == 3 %}selected{% endif %}>3 layers</option>
+                  <option value="4" {% if lstm_layers_rnn == 4 %}selected{% endif %}>4 layers</option>
+                </select>
+              </div>
+              <div class="mt-2">
+                <label for="lstm-hidden-dim-rnn" class="form-label">Hidden dim</label>
+                <input type="number" class="form-control" id="lstm-hidden-dim-rnn" name="lstm_hidden_dim" min="8" max="512" value="{{ lstm_hidden_dim_rnn }}">
+              </div>
+              <div class="form-text mt-2">
+                In RNNModel, output chunk is always 1. Training length must be greater than input chunk (ideally input + horizon).
+              </div>
+              <div class="form-text">
+                If error degrades with horizon, increase training length before adding layers.
+              </div>
+              <div class="form-text">
+                Defaults: epochs 200, batch 64, SmoothL1 loss, ReduceLROnPlateau.
+              </div>
+            </div>
+            <div class="mt-3" data-rnn-model="block" hidden>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label for="lstm-input-chunk-block" class="form-label">Input chunk</label>
+                  <input type="number" class="form-control" id="lstm-input-chunk-block" name="lstm_input_chunk" min="5" max="{{ max_days }}" value="{{ lstm_input_chunk_block }}" disabled>
+                </div>
+                <div class="col-6">
+                  <label for="lstm-output-chunk" class="form-label">Output chunk</label>
+                  <input type="number" class="form-control" id="lstm-output-chunk" name="lstm_output_chunk" min="1" max="{{ max_days }}" value="{{ lstm_output_chunk }}" disabled>
+                </div>
+              </div>
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label for="lstm-hidden-dim" class="form-label">Hidden dim</label>
+                  <input type="number" class="form-control" id="lstm-hidden-dim" name="lstm_hidden_dim" min="8" max="512" value="{{ lstm_hidden_dim_block }}" disabled>
+                </div>
+                <div class="col-6">
+                  <label for="lstm-layers-block" class="form-label">RNN layers</label>
+                  <select class="form-select" id="lstm-layers-block" name="lstm_layers" disabled>
+                    <option value="1" {% if lstm_layers_block == 1 %}selected{% endif %}>1 layer</option>
+                    <option value="2" {% if lstm_layers_block == 2 %}selected{% endif %}>2 layers</option>
+                    <option value="3" {% if lstm_layers_block == 3 %}selected{% endif %}>3 layers</option>
+                    <option value="4" {% if lstm_layers_block == 4 %}selected{% endif %}>4 layers</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mt-2">
+                <label for="lstm-hidden-fc" class="form-label">Hidden FC sizes</label>
+                <input type="text" class="form-control" id="lstm-hidden-fc" name="lstm_hidden_fc_sizes" value="{{ lstm_hidden_fc_sizes }}" disabled>
+                <div class="form-text">Comma-separated, e.g. 64, 32.</div>
+                <div class="form-text">Decoder FC maps the last hidden state to the output block.</div>
+              </div>
+              <div class="form-text mt-2">
+                Output chunk >= horizon avoids autoregression; 30 is a good baseline for 30 days.
+              </div>
+              <div class="form-text">
+                Tune input chunk first (120/180/240/365), then hidden dim or layers.
+              </div>
+              <div class="form-text">
+                Defaults: epochs 200, batch 64, SmoothL1 loss, ReduceLROnPlateau.
+              </div>
             </div>
           </div>
           <div class="modal-footer">
@@ -161,8 +238,15 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            {% set gru_layers = 1 %}
-            {% set gru_output_chunk = 1 %}
+            {% set gru_layers_rnn = 2 %}
+            {% set gru_layers_block = 2 %}
+            {% set gru_output_chunk = 30 %}
+            {% set gru_input_chunk_rnn = 180 %}
+            {% set gru_input_chunk_block = 180 %}
+            {% set gru_training_length = 210 %}
+            {% set gru_hidden_dim_rnn = 64 %}
+            {% set gru_hidden_dim_block = 64 %}
+            {% set gru_hidden_fc_sizes = "64, 32" %}
             <label for="gru-days" class="form-label">GRU range</label>
             <select class="form-select" id="gru-days" name="gru_days">
               <option value="0" {% if gru_days == 0 %}selected{% endif %}>All</option>
@@ -172,20 +256,90 @@
               <option value="365" {% if gru_days == 365 %}selected{% endif %}>1 year</option>
             </select>
             <div class="mt-3">
-              <label for="gru-layers" class="form-label">GRU layers</label>
-              <select class="form-select" id="gru-layers" name="gru_layers">
-                <option value="1" {% if gru_layers == 1 %}selected{% endif %}>1 layer</option>
-                <option value="2" {% if gru_layers == 2 %}selected{% endif %}>2 layers</option>
-                <option value="3" {% if gru_layers == 3 %}selected{% endif %}>3 layers</option>
+              <label for="gru-model" class="form-label">Model type</label>
+              <select class="form-select" id="gru-model" name="gru_model" data-rnn-model-select="1">
+                <option value="rnn" selected>RNNModel (1-step)</option>
+                <option value="block">BlockRNNModel (multi-step)</option>
               </select>
+              <div class="form-text">
+                RNNModel steps forward iteratively and needs future covariates; BlockRNNModel predicts the full block.
+              </div>
             </div>
-            <div class="mt-3">
-              <label for="gru-output-chunk" class="form-label">Output chunk length</label>
-              <select class="form-select" id="gru-output-chunk" name="gru_output_chunk">
-                <option value="1" {% if gru_output_chunk == 1 %}selected{% endif %}>1 step</option>
-                <option value="2" {% if gru_output_chunk == 2 %}selected{% endif %}>2 steps</option>
-                <option value="3" {% if gru_output_chunk == 3 %}selected{% endif %}>3 steps</option>
-              </select>
+            <div class="mt-3" data-rnn-model="rnn">
+              <div class="row g-2">
+                <div class="col-6">
+                  <label for="gru-input-chunk" class="form-label">Input chunk</label>
+                  <input type="number" class="form-control" id="gru-input-chunk" name="gru_input_chunk" min="5" max="{{ max_days }}" value="{{ gru_input_chunk_rnn }}">
+                </div>
+                <div class="col-6">
+                  <label for="gru-training-length" class="form-label">Training length</label>
+                  <input type="number" class="form-control" id="gru-training-length" name="gru_training_length" min="10" max="{{ max_days }}" value="{{ gru_training_length }}">
+                </div>
+              </div>
+              <div class="mt-2">
+                <label for="gru-layers" class="form-label">RNN layers</label>
+                <select class="form-select" id="gru-layers" name="gru_layers">
+                  <option value="1" {% if gru_layers_rnn == 1 %}selected{% endif %}>1 layer</option>
+                  <option value="2" {% if gru_layers_rnn == 2 %}selected{% endif %}>2 layers</option>
+                  <option value="3" {% if gru_layers_rnn == 3 %}selected{% endif %}>3 layers</option>
+                  <option value="4" {% if gru_layers_rnn == 4 %}selected{% endif %}>4 layers</option>
+                </select>
+              </div>
+              <div class="mt-2">
+                <label for="gru-hidden-dim-rnn" class="form-label">Hidden dim</label>
+                <input type="number" class="form-control" id="gru-hidden-dim-rnn" name="gru_hidden_dim" min="8" max="512" value="{{ gru_hidden_dim_rnn }}">
+              </div>
+              <div class="form-text mt-2">
+                In RNNModel, output chunk is always 1. Training length must be greater than input chunk (ideally input + horizon).
+              </div>
+              <div class="form-text">
+                If error degrades with horizon, increase training length before adding layers.
+              </div>
+              <div class="form-text">
+                Defaults: epochs 200, batch 64, SmoothL1 loss, ReduceLROnPlateau.
+              </div>
+            </div>
+            <div class="mt-3" data-rnn-model="block" hidden>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label for="gru-input-chunk-block" class="form-label">Input chunk</label>
+                  <input type="number" class="form-control" id="gru-input-chunk-block" name="gru_input_chunk" min="5" max="{{ max_days }}" value="{{ gru_input_chunk_block }}" disabled>
+                </div>
+                <div class="col-6">
+                  <label for="gru-output-chunk" class="form-label">Output chunk</label>
+                  <input type="number" class="form-control" id="gru-output-chunk" name="gru_output_chunk" min="1" max="{{ max_days }}" value="{{ gru_output_chunk }}" disabled>
+                </div>
+              </div>
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label for="gru-hidden-dim" class="form-label">Hidden dim</label>
+                  <input type="number" class="form-control" id="gru-hidden-dim" name="gru_hidden_dim" min="8" max="512" value="{{ gru_hidden_dim_block }}" disabled>
+                </div>
+                <div class="col-6">
+                  <label for="gru-layers-block" class="form-label">RNN layers</label>
+                  <select class="form-select" id="gru-layers-block" name="gru_layers" disabled>
+                    <option value="1" {% if gru_layers_block == 1 %}selected{% endif %}>1 layer</option>
+                    <option value="2" {% if gru_layers_block == 2 %}selected{% endif %}>2 layers</option>
+                    <option value="3" {% if gru_layers_block == 3 %}selected{% endif %}>3 layers</option>
+                    <option value="4" {% if gru_layers_block == 4 %}selected{% endif %}>4 layers</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mt-2">
+                <label for="gru-hidden-fc" class="form-label">Hidden FC sizes</label>
+                <input type="text" class="form-control" id="gru-hidden-fc" name="gru_hidden_fc_sizes" value="{{ gru_hidden_fc_sizes }}" disabled>
+                <div class="form-text">Comma-separated, e.g. 64, 32.</div>
+                <div class="form-text">Decoder FC maps the last hidden state to the output block.</div>
+              </div>
+              <div class="form-text mt-2">
+                Output chunk >= horizon avoids autoregression; 30 is a good baseline for 30 days.
+              </div>
+              <div class="form-text">
+                Tune input chunk first (120/180/240/365), then hidden dim or layers.
+              </div>
+              <div class="form-text">
+                Defaults: epochs 200, batch 64, SmoothL1 loss, ReduceLROnPlateau.
+              </div>
             </div>
           </div>
           <div class="modal-footer">
