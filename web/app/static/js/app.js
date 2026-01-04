@@ -54,23 +54,37 @@ document.addEventListener("DOMContentLoaded", () => {
       return existing;
     }
     const container = document.createElement("div");
-    container.className = "toast-container position-fixed bottom-0 end-0 p-3";
+    container.className = "toast-container ct-toast-container position-fixed";
     container.id = "toast-container";
     document.body.appendChild(container);
     return container;
   };
+  const toastIcons = {
+    success: '<i class="bi bi-check-circle-fill"></i>',
+    warning: '<i class="bi bi-exclamation-triangle-fill"></i>',
+    danger: '<i class="bi bi-x-circle-fill"></i>',
+    info: '<i class="bi bi-info-circle-fill"></i>',
+  };
+  const normalizeToastVariant = (variant) =>
+    variant === "error" ? "danger" : variant;
   const showToast = (message, variant = "info", options = {}) => {
     if (!window.bootstrap || !bootstrap.Toast) {
       return null;
     }
     const toastContainer = getToastContainer();
     const toastEl = document.createElement("div");
-    toastEl.className = `toast align-items-center text-bg-${variant} border-0`;
+    const resolvedVariant = normalizeToastVariant(variant);
+    const iconMarkup = toastIcons[resolvedVariant] || toastIcons.info;
+    toastEl.className = "toast ct-toast align-items-center border-0";
+    toastEl.dataset.variant = resolvedVariant;
     toastEl.setAttribute("role", "alert");
     toastEl.setAttribute("aria-live", "assertive");
     toastEl.setAttribute("aria-atomic", "true");
     toastEl.innerHTML = `
-      <div class="d-flex">
+      <div class="ct-toast-inner">
+        <div class="ct-toast-icon" aria-hidden="true">
+          ${iconMarkup}
+        </div>
         <div class="toast-body">${message}</div>
       </div>
     `;

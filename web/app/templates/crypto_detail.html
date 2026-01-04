@@ -31,17 +31,11 @@
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
       <button class="btn btn-sm btn-primary ct-btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#backfill-modal">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-          <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0-.912-.41A4 4 0 1 1 8 4h1.5a.5.5 0 0 0 0-1H8z"/>
-          <path d="M8 1.5a.5.5 0 0 0-.5.5v2.793L6.354 3.146a.5.5 0 1 0-.708.708l2.147 2.146a.5.5 0 0 0 .707 0l2.147-2.146a.5.5 0 0 0-.708-.708L8.5 4.793V2a.5.5 0 0 0-.5-.5z"/>
-        </svg>
+        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
         <span>Update</span>
       </button>
       <button type="button" class="btn btn-sm btn-outline-danger ct-btn-icon" data-bs-toggle="modal" data-bs-target="#remove-modal" data-remove-action="{{ url_for('cryptos.remove_crypto', crypto_id=crypto.id) }}" data-remove-name="{{ crypto.name or crypto.coingecko_id }}" data-remove-symbol="{{ crypto.symbol|upper if crypto.symbol else '' }}" aria-label="Remove" title="Remove">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-          <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0v-6zm2-.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5z"/>
-          <path d="M14.5 3a1 1 0 0 1-1 1H13l-.854 9.604A2 2 0 0 1 10.153 15H5.847a2 2 0 0 1-1.993-1.396L3 4H2.5a1 1 0 0 1 0-2H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4l.805 9.047A1 1 0 0 0 5.847 14h4.306a1 1 0 0 0 .924-.953L11.882 4H4.118z"/>
-        </svg>
+        <i class="bi bi-trash" aria-hidden="true"></i>
         <span>Remove</span>
       </button>
     </div>
@@ -485,10 +479,7 @@
         <div class="card shadow-sm h-100">
           <div class="card-body">
             <div class="d-flex align-items-center gap-2 text-muted small">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-                <path d="M2.5 2a.5.5 0 0 0 0 1H4v9a2 2 0 0 0 2 2h5a2 2 0 0 0 2-2V3h1.5a.5.5 0 0 0 0-1h-12zm2.5 1h6v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3z"/>
-                <path d="M5 0a1 1 0 0 0-1 1v1h8V1a1 1 0 0 0-1-1H5z"/>
-              </svg>
+              <i class="bi bi-cash-coin" aria-hidden="true"></i>
               Latest price
             </div>
             <div class="fs-4 fw-semibold mt-2 ct-price" title="{{ price_prefix }}{{ "{:,.4f}".format(ns.last_price) if ns.last_price is not none else '--' }}">
@@ -506,10 +497,7 @@
         <div class="card shadow-sm h-100">
           <div class="card-body">
             <div class="d-flex align-items-center gap-2 text-muted small">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-                <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0-.912-.41A4 4 0 1 1 8 4h1.5a.5.5 0 0 0 0-1H8z"/>
-                <path d="M8 1.5a.5.5 0 0 0-.5.5v2.793L6.354 3.146a.5.5 0 1 0-.708.708l2.147 2.146a.5.5 0 0 0 .707 0l2.147-2.146a.5.5 0 0 0-.708-.708L8.5 4.793V2a.5.5 0 0 0-.5-.5z"/>
-              </svg>
+              <i class="bi bi-graph-up" aria-hidden="true"></i>
               24h change
             </div>
             <div class="fs-4 fw-semibold mt-2 ct-price {{ change_class }}">
@@ -533,9 +521,7 @@
         <div class="card shadow-sm h-100">
           <div class="card-body">
             <div class="d-flex align-items-center gap-2 text-muted small">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v1H0V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM0 5h16v9a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5zm4 3a.5.5 0 0 0 0 1h8a.5.5 0 0 0 0-1H4z"/>
-              </svg>
+              <i class="bi bi-calendar-event" aria-hidden="true"></i>
               Last update
             </div>
             <div class="fs-5 fw-semibold mt-2">
@@ -549,9 +535,7 @@
         <div class="card shadow-sm h-100">
           <div class="card-body">
             <div class="d-flex align-items-center gap-2 text-muted small">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" aria-hidden="true" viewBox="0 0 16 16">
-                <path d="M4 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm9 2a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM0 7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1H0V7zm10-2h4a2 2 0 0 1 2 2v1h-6V7a2 2 0 0 1 2-2zm-4 6a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v1h6v-1zm6-2a2 2 0 0 0-2 2v1h6v-1a2 2 0 0 0-2-2h-2z"/>
-              </svg>
+              <i class="bi bi-database" aria-hidden="true"></i>
               Data source
             </div>
             <div class="fs-5 fw-semibold mt-2">CoinGecko</div>
