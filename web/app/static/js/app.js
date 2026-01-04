@@ -308,6 +308,22 @@ document.addEventListener("DOMContentLoaded", () => {
       select.addEventListener("change", () => toggleRnnModelFields(select));
     });
 
+  document.querySelectorAll("input[data-range-output]").forEach((input) => {
+    const selector = input.dataset.rangeOutput;
+    if (!selector) {
+      return;
+    }
+    const output = document.querySelector(selector);
+    if (!output) {
+      return;
+    }
+    const sync = () => {
+      output.textContent = input.value;
+    };
+    sync();
+    input.addEventListener("input", sync);
+  });
+
   const jobForms = document.querySelectorAll(
     "form[data-job-type][data-job-status-url]",
   );

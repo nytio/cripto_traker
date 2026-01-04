@@ -113,6 +113,30 @@ def _parse_choice(value: str | None, allowed: set[str], default: str) -> str:
     return default
 
 
+def _parse_float_choice(
+    value: str | None, choices: dict[str, float], default: float
+) -> float:
+    if value in choices:
+        return choices[value]
+    return default
+
+
+def _parse_float_range(
+    value: str | None, default: float, min_value: float, max_value: float
+) -> float:
+    if not value:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError:
+        return default
+    if parsed < min_value:
+        return min_value
+    if parsed > max_value:
+        return max_value
+    return parsed
+
+
 def _parse_int_list(
     value: str | None,
     default: list[int],
@@ -228,6 +252,40 @@ def recalculate_prophet(crypto_id: int):
     max_days = current_app.config["MAX_HISTORY_DAYS"]
     prophet_days_raw = request.form.get("prophet_days", "").strip()
     prophet_days = clamp_days(prophet_days_raw, max_days)
+    yearly_raw = request.form.get("prophet_yearly", "").strip().lower()
+    if yearly_raw == "false":
+        yearly_seasonality: bool | str = False
+    elif yearly_raw == "auto":
+        yearly_seasonality = "auto"
+    else:
+        yearly_seasonality = True
+    changepoint_scale = _parse_float_choice(
+        request.form.get("prophet_changepoint"),
+        {
+            "0.001": 0.001,
+            "0.01": 0.01,
+            "0.05": 0.05,
+            "0.1": 0.1,
+            "0.5": 0.5,
+        },
+        0.05,
+    )
+    seasonality_scale = _parse_float_choice(
+        request.form.get("prophet_seasonality"),
+        {
+            "0.01": 0.01,
+            "0.1": 0.1,
+            "1.0": 1.0,
+            "10.0": 10.0,
+        },
+        1.0,
+    )
+    changepoint_range = _parse_float_range(
+        request.form.get("prophet_changepoint_range"),
+        0.8,
+        0.8,
+        0.95,
+    )
     job_key = _job_key(job_type, crypto_id)
 
     def run_prophet():
@@ -237,7 +295,14 @@ def recalculate_prophet(crypto_id: int):
             if len(rows) < 2:
                 raise ValueError("Not enough price history for Prophet")
             stored = store_prophet_forecast(
-                job_session, crypto_id, rows, horizon_days
+                job_session,
+                crypto_id,
+                rows,
+                horizon_days,
+                yearly_seasonality=yearly_seasonality,
+                changepoint_prior_scale=changepoint_scale,
+                seasonality_prior_scale=seasonality_scale,
+                changepoint_range=changepoint_range,
             )
             if not stored:
                 raise RuntimeError("Prophet forecast not available")

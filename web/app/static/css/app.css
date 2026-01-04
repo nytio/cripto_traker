@@ -22,6 +22,8 @@
   --ct-muted: var(--muted);
   --ct-border: var(--border);
   --ct-border-strong: var(--border-strong);
+  --ct-input-border: rgba(15, 23, 42, 0.2);
+  --ct-input-bg: #ffffff;
   --ct-primary: var(--primary);
   --ct-primary-hover: var(--primary-hover);
   --ct-danger: var(--danger);
@@ -351,13 +353,21 @@ a:hover {
 .form-control,
 .form-select {
   border-radius: var(--ct-radius-md);
-  border-color: rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--ct-input-border);
+  background-color: var(--ct-input-bg);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
 }
 
 .form-control:focus,
 .form-select:focus {
   border-color: var(--ct-primary);
   box-shadow: 0 0 0 0.2rem rgba(10, 132, 255, 0.2);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  border-color: rgba(15, 23, 42, 0.16);
+  background-color: rgba(255, 255, 255, 0.9);
 }
 
 .form-control-sm,
@@ -488,6 +498,10 @@ a:hover {
 .ct-toolbar-action:hover,
 .ct-toolbar-action:focus {
   background: rgba(0, 0, 0, 0.06);
+}
+
+.ct-rnn-model-sections {
+  min-height: 17rem;
 }
 
 .ct-toolbar-action:disabled,

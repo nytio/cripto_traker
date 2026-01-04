@@ -108,7 +108,12 @@ def _prophet_ready() -> bool:
 
 
 def compute_prophet_forecast(
-    rows: list[dict[str, Any]], horizon_days: int
+    rows: list[dict[str, Any]],
+    horizon_days: int,
+    yearly_seasonality: bool | str = True,
+    changepoint_prior_scale: float = 0.05,
+    seasonality_prior_scale: float = 1.0,
+    changepoint_range: float = 0.8,
 ) -> list[dict[str, Any]]:
     if horizon_days <= 0 or len(rows) < 2 or not _prophet_ready():
         return []
@@ -128,7 +133,10 @@ def compute_prophet_forecast(
         model = Prophet(
             daily_seasonality=False,
             weekly_seasonality=True,
-            yearly_seasonality=True,
+            yearly_seasonality=yearly_seasonality,
+            changepoint_prior_scale=changepoint_prior_scale,
+            seasonality_prior_scale=seasonality_prior_scale,
+            changepoint_range=changepoint_range,
             stan_backend="CMDSTANPY",
         )
         model.fit(df)

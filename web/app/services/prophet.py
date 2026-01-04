@@ -21,11 +21,22 @@ def store_prophet_forecast(
     crypto_id: int,
     rows: list[dict[str, Any]],
     horizon_days: int,
+    yearly_seasonality: bool | str = True,
+    changepoint_prior_scale: float = 0.05,
+    seasonality_prior_scale: float = 1.0,
+    changepoint_range: float = 0.8,
 ) -> int:
     if horizon_days <= 0 or len(rows) < 2:
         return 0
     cutoff_date = rows[-1]["date"]
-    forecast = compute_prophet_forecast(rows, horizon_days)
+    forecast = compute_prophet_forecast(
+        rows,
+        horizon_days,
+        yearly_seasonality=yearly_seasonality,
+        changepoint_prior_scale=changepoint_prior_scale,
+        seasonality_prior_scale=seasonality_prior_scale,
+        changepoint_range=changepoint_range,
+    )
     if not forecast:
         return 0
 
