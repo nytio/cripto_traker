@@ -31,6 +31,9 @@ RUN chmod -R a+rX /opt/cmdstan
 
 COPY . .
 
+RUN mkdir -p /app/data/darts \
+    && chown -R app:app /app/data
+
 USER app
 
 EXPOSE 8000

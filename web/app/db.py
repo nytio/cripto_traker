@@ -1,6 +1,6 @@
 import time
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import declarative_base, scoped_session, sessionmaker
 
@@ -33,6 +33,7 @@ def init_db(app) -> None:
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _ensure_forecast_model_run_columns(engine)
 
     @app.teardown_appcontext
     def remove_session(exception=None) -> None:
@@ -50,3 +51,18 @@ def get_engine():
     if Engine is None:
         raise RuntimeError("Database not initialized")
     return Engine
+
+
+def _ensure_forecast_model_run_columns(engine) -> None:
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    for table in ("lstm_forecasts", "gru_forecasts"):
+        if table not in tables:
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        if "model_run_id" in columns:
+            continue
+        with engine.begin() as conn:
+            conn.execute(
+                text(f"ALTER TABLE {table} ADD COLUMN model_run_id INTEGER")
+            )

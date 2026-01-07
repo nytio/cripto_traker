@@ -68,7 +68,8 @@ if (chartEl) {
     const dates = series.map((row) => row.date);
     const prices = series.map((row) => row.price);
     const sma7 = series.map((row) => row.sma_7);
-    const sma30 = series.map((row) => row.sma_30);
+    const sma50 = series.map((row) => row.sma_50);
+    const sma20 = series.map((row) => row.sma_20);
     const bbUpper = series.map((row) => row.bb_upper);
     const bbLower = series.map((row) => row.bb_lower);
     const prophetForecastRaw = JSON.parse(chartEl.dataset.prophet || "[]");
@@ -94,6 +95,8 @@ if (chartEl) {
       markerLine: "rgba(160, 160, 160, 0.8)",
       bollingerBand: "rgba(148, 103, 189, 0.15)",
       bollingerLine: "rgba(148, 103, 189, 0.3)",
+      sma50: "#2CA02C",
+      sma20: "rgba(148, 103, 189, 0.7)",
     };
     const lineWidths = {
       price: 2.5,
@@ -393,17 +396,27 @@ if (chartEl) {
         name: "SMA 7",
         showlegend: false,
         visible: "legendonly",
-        line: { color: "#FF7F0E", width: smaLineWidth },
+        line: { color: "#FF7F0E", dash: "dash", width: smaLineWidth },
       },
       {
         x: dates,
-        y: sma30,
+        y: sma50,
         type: "scatter",
         mode: "lines",
-        name: "SMA 30",
+        name: "SMA 50",
         showlegend: false,
         visible: "legendonly",
-        line: { color: "#7F7F7F", dash: "dash", width: smaLineWidth },
+        line: { color: chartColors.sma50, dash: "dash", width: smaLineWidth },
+      },
+      {
+        x: dates,
+        y: sma20,
+        type: "scatter",
+        mode: "lines",
+        name: "SMA 20",
+        showlegend: false,
+        visible: "legendonly",
+        line: { color: chartColors.sma20, dash: "dash", width: smaLineWidth },
       },
       {
         x: dates,
@@ -452,7 +465,8 @@ if (chartEl) {
     Plotly.newPlot("price-chart", data, layout, { responsive: true });
 
     const sma7Toggle = document.getElementById("toggle-sma-7");
-    const sma30Toggle = document.getElementById("toggle-sma-30");
+    const sma50Toggle = document.getElementById("toggle-sma-50");
+    const sma20Toggle = document.getElementById("toggle-sma-20");
     const bollingerToggle = document.getElementById("toggle-bollinger");
     const prophetToggle = document.getElementById("toggle-prophet");
     const lstmToggle = document.getElementById("toggle-lstm");
@@ -473,7 +487,7 @@ if (chartEl) {
     const priceMonoIndex = priceTraceOffset + priceTraces.length;
     const indicatorOffset = priceMonoIndex + 1;
     const bollingerBandIndices = bollingerBandTraces.map((_, index) => index);
-    const bollingerLineIndices = [indicatorOffset + 2, indicatorOffset + 3];
+    const bollingerLineIndices = [indicatorOffset + 3, indicatorOffset + 4];
     const bollingerTraceIndices = [...bollingerBandIndices, ...bollingerLineIndices];
 
     const setVisibility = (traceIndices, visible) => {
@@ -505,10 +519,16 @@ if (chartEl) {
         persistToggleState("sma7", event.target.checked);
       });
     }
-    if (sma30Toggle) {
-      sma30Toggle.addEventListener("change", (event) => {
+    if (sma50Toggle) {
+      sma50Toggle.addEventListener("change", (event) => {
         setVisibility([indicatorOffset + 1], event.target.checked);
-        persistToggleState("sma30", event.target.checked);
+        persistToggleState("sma50", event.target.checked);
+      });
+    }
+    if (sma20Toggle) {
+      sma20Toggle.addEventListener("change", (event) => {
+        setVisibility([indicatorOffset + 2], event.target.checked);
+        persistToggleState("sma20", event.target.checked);
       });
     }
     if (bollingerToggle) {
@@ -598,7 +618,8 @@ if (chartEl) {
     };
 
     applyToggleState(sma7Toggle, "sma7");
-    applyToggleState(sma30Toggle, "sma30");
+    applyToggleState(sma50Toggle, "sma50");
+    applyToggleState(sma20Toggle, "sma20");
     applyToggleState(bollingerToggle, "bollinger");
     applyToggleState(prophetToggle, "prophet");
     applyToggleState(lstmToggle, "lstm");

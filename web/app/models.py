@@ -5,6 +5,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     Numeric,
     String,
     UniqueConstraint,
@@ -96,11 +97,35 @@ class ProphetForecast(Base):
     )
 
 
+class ForecastModelRun(Base):
+    __tablename__ = "forecast_model_runs"
+
+    id = Column(Integer, primary_key=True)
+    scope = Column(String(32), nullable=False)
+    model_family = Column(String(32), nullable=False)
+    cell_type = Column(String(16), nullable=False)
+    horizon_days = Column(Integer, nullable=False, server_default="30")
+    transform = Column(String(64), nullable=False)
+    hyperparams_json = Column(JSON)
+    training_crypto_ids = Column(JSON)
+    train_start_date = Column(Date)
+    train_end_date = Column(Date)
+    cutoff_date = Column(Date)
+    artifact_path_pt = Column(String(512))
+    work_dir = Column(String(512))
+    model_name = Column(String(256))
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    lstm_forecasts = relationship("LstmForecast", back_populates="model_run")
+    gru_forecasts = relationship("GruForecast", back_populates="model_run")
+
+
 class LstmForecast(Base):
     __tablename__ = "lstm_forecasts"
 
     id = Column(Integer, primary_key=True)
     crypto_id = Column(Integer, ForeignKey("cryptocurrencies.id"), nullable=False)
+    model_run_id = Column(Integer, ForeignKey("forecast_model_runs.id"))
     date = Column(Date, nullable=False)
     yhat = Column(Numeric(18, 8))
     yhat_lower = Column(Numeric(18, 8))
@@ -110,6 +135,7 @@ class LstmForecast(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     crypto = relationship("Cryptocurrency", back_populates="lstm_forecasts")
+    model_run = relationship("ForecastModelRun", back_populates="lstm_forecasts")
 
     __table_args__ = (
         UniqueConstraint("crypto_id", "date", name="uq_lstm_crypto_date"),
@@ -122,6 +148,7 @@ class GruForecast(Base):
 
     id = Column(Integer, primary_key=True)
     crypto_id = Column(Integer, ForeignKey("cryptocurrencies.id"), nullable=False)
+    model_run_id = Column(Integer, ForeignKey("forecast_model_runs.id"))
     date = Column(Date, nullable=False)
     yhat = Column(Numeric(18, 8))
     yhat_lower = Column(Numeric(18, 8))
@@ -131,6 +158,7 @@ class GruForecast(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     crypto = relationship("Cryptocurrency", back_populates="gru_forecasts")
+    model_run = relationship("ForecastModelRun", back_populates="gru_forecasts")
 
     __table_args__ = (
         UniqueConstraint("crypto_id", "date", name="uq_gru_crypto_date"),

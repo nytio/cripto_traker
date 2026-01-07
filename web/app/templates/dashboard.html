@@ -50,9 +50,22 @@
           <table class="table table-hover align-middle ct-table" id="assets-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Symbol</th>
-                <th class="text-end">Latest price <span class="ct-meta">({{ currency }})</span></th>
+                <th>
+                  <div>Name</div>
+                  <div class="ct-meta">Symbol</div>
+                </th>
+                <th class="text-end">
+                  <div>Latest price <span class="ct-meta">({{ currency }})</span></div>
+                  <div class="ct-meta">Date</div>
+                </th>
+                <th class="text-end">
+                  <div>Bollinger</div>
+                  <div class="ct-meta" title="Bollinger BandWidth">BBW</div>
+                </th>
+                <th class="text-end">
+                  <div>Prophet</div>
+                  <div class="ct-meta" title="Percentage Price Oscillator">PPO</div>
+                </th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
@@ -63,12 +76,12 @@
                 <tr data-search-text="{{ name }} {{ symbol }}">
                   <td>
                     <div class="fw-semibold">{{ name }}</div>
-                  </td>
-                  <td>
                     {% if symbol %}
-                      <span class="badge bg-light text-dark">{{ symbol|upper }}</span>
+                      <div class="small text-muted">
+                        <span class="badge bg-light text-dark">{{ symbol|upper }}</span>
+                      </div>
                     {% else %}
-                      <span class="text-muted">--</span>
+                      <div class="small text-muted">--</div>
                     {% endif %}
                   </td>
                   <td class="text-end">
@@ -79,6 +92,24 @@
                       </div>
                     {% else %}
                       <span class="text-muted">--</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if row.bollinger_percent is not none %}
+                      <div class="fw-semibold">{{ "{:.0f}".format(row.bollinger_percent * 100) }}</div>
+                      {% if row.bollinger_bandwidth is not none %}
+                        <div class="text-muted small">{{ "{:.3f}".format(row.bollinger_bandwidth) }}</div>
+                      {% endif %}
+                    {% else %}
+                      <span class="text-muted">--</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if row.prophet_percent is not none %}
+                      <div class="fw-semibold">{{ "{:.1f}".format(row.prophet_percent * 100) }}</div>
+                      {% if row.sma_spread is not none %}
+                        <div class="text-muted small">{{ "{:.3f}".format(row.sma_spread) }}</div>
+                      {% endif %}
                     {% endif %}
                   </td>
                   <td>

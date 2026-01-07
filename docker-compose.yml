@@ -33,8 +33,11 @@ services:
       COINGECKO_RETRY_COUNT: ${COINGECKO_RETRY_COUNT}
       COINGECKO_RETRY_DELAY: ${COINGECKO_RETRY_DELAY}
       LOG_LEVEL: ${LOG_LEVEL}
+      DARTS_WORK_DIR: ${DARTS_WORK_DIR:-/app/data/darts}
     ports:
       - "[::1]:8080:8000/tcp"
+    volumes:
+      - dartsdata:/app/data/darts
 
   scheduler:
     build: ./web
@@ -58,12 +61,15 @@ services:
       COINGECKO_RETRY_COUNT: ${COINGECKO_RETRY_COUNT}
       COINGECKO_RETRY_DELAY: ${COINGECKO_RETRY_DELAY}
       LOG_LEVEL: ${LOG_LEVEL}
+      DARTS_WORK_DIR: ${DARTS_WORK_DIR:-/app/data/darts}
       SCHEDULER_TIMEZONE: ${SCHEDULER_TIMEZONE}
       SCHEDULE_HOUR: ${SCHEDULE_HOUR}
       SCHEDULE_MINUTE: ${SCHEDULE_MINUTE}
       SCHEDULE_RUN_ON_START: ${SCHEDULE_RUN_ON_START}
       SCHEDULE_OFFSET_DAYS: ${SCHEDULE_OFFSET_DAYS}
     command: ["python", "-m", "app.scripts.scheduler"]
+    volumes:
+      - dartsdata:/app/data/darts
     profiles: ["scheduler"]
 
   nginx:
@@ -81,3 +87,4 @@ services:
 
 volumes:
   pgdata:
+  dartsdata:

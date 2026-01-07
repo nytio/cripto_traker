@@ -322,6 +322,219 @@ document.addEventListener("DOMContentLoaded", () => {
       select.addEventListener("change", () => toggleRnnModelFields(select));
     });
 
+  const toggleForecastScopeFields = (select) => {
+    const form = select.closest("form");
+    if (!form) {
+      return;
+    }
+    const scope = select.value;
+    form.querySelectorAll("[data-forecast-scope]").forEach((section) => {
+      const isActive = section.dataset.forecastScope === scope;
+      section.hidden = !isActive;
+      section.querySelectorAll("input, select, textarea").forEach((input) => {
+        input.disabled = !isActive;
+      });
+    });
+  };
+
+  document
+    .querySelectorAll("[data-forecast-scope-select='1']")
+    .forEach((select) => {
+      toggleForecastScopeFields(select);
+      select.addEventListener("change", () =>
+        toggleForecastScopeFields(select),
+      );
+    });
+
+  const parseHyperparams = (raw) => {
+    if (!raw) {
+      return null;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const normalizeParamValue = (key, value) => {
+    if (value === null || typeof value === "undefined") {
+      return null;
+    }
+    if (key === "hidden_fc_sizes" && Array.isArray(value)) {
+      return value.join(", ");
+    }
+    return value;
+  };
+
+  const applyRunParams = (form, params) => {
+    if (!params) {
+      return;
+    }
+    form.querySelectorAll("[data-global-param]").forEach((field) => {
+      const key = field.dataset.globalParam;
+      if (!key || !(key in params)) {
+        return;
+      }
+      const normalized = normalizeParamValue(key, params[key]);
+      if (normalized === null || typeof normalized === "undefined") {
+        return;
+      }
+      const value = String(normalized);
+      if (field.tagName === "SELECT") {
+        const option = Array.from(field.options).find(
+          (item) => item.value === value,
+        );
+        if (option) {
+          field.value = value;
+        }
+      } else {
+        field.value = value;
+      }
+    });
+  };
+
+  const setParamLock = (form, locked) => {
+    form.querySelectorAll("[data-global-param]").forEach((field) => {
+      const section = field.closest("[data-rnn-model]");
+      const isHidden = section ? section.hidden : false;
+      field.disabled = locked || isHidden;
+    });
+  };
+
+  const filterRunOptions = (select, modelFamily) => {
+    Array.from(select.options).forEach((option) => {
+      if (!option.value) {
+        option.hidden = false;
+        option.disabled = false;
+        return;
+      }
+      const optionFamily = option.dataset.modelFamily || "";
+      const matches = !modelFamily || optionFamily === modelFamily;
+      option.hidden = !matches;
+      option.disabled = !matches;
+    });
+  };
+
+  const initGlobalModelSelector = (form) => {
+    const select = form.querySelector("[data-global-model-select='1']");
+    if (!select) {
+      return;
+    }
+
+    const modelSelect = form.querySelector("[data-rnn-model-select='1']");
+    const scopeSelect = form.querySelector("[data-forecast-scope-select='1']");
+    const deleteButton = form.querySelector("[data-global-delete-button='1']");
+    const deleteFormId = deleteButton
+      ? deleteButton.dataset.globalDeleteForm
+      : "";
+    const deleteForm = deleteFormId
+      ? document.getElementById(deleteFormId)
+      : null;
+    const deleteInput = deleteForm
+      ? deleteForm.querySelector("input[name='model_run_id']")
+      : null;
+    const retrainWrapper = form.querySelector("[data-global-retrain='1']");
+    const retrainInput = retrainWrapper
+      ? retrainWrapper.querySelector("input[type='checkbox']")
+      : null;
+    const resolveModelFamily = () => {
+      const value = modelSelect ? modelSelect.value : "rnn";
+      return value === "block" ? "BlockRNNModel" : "RNNModel";
+    };
+    const isGlobalScope = () =>
+      !scopeSelect || scopeSelect.value === "global_shared";
+    const updateDeleteState = () => {
+      const canDelete = isGlobalScope() && Boolean(select.value);
+      if (deleteButton) {
+        deleteButton.hidden = !canDelete;
+        deleteButton.disabled = !canDelete;
+      }
+      if (deleteInput) {
+        deleteInput.value = select.value || "";
+      }
+    };
+    const updateRetrainState = () => {
+      const show = isGlobalScope() && Boolean(select.value);
+      if (retrainWrapper) {
+        retrainWrapper.hidden = !show;
+      }
+      if (retrainInput) {
+        if (!show) {
+          retrainInput.checked = true;
+        }
+        retrainInput.disabled = !show;
+      }
+    };
+    const updateLock = () => {
+      const locked = isGlobalScope() && Boolean(select.value);
+      setParamLock(form, locked);
+      updateDeleteState();
+      updateRetrainState();
+    };
+
+    const applySelection = () => {
+      if (isGlobalScope()) {
+        const option = select.options[select.selectedIndex];
+        if (option && option.value) {
+          const params = parseHyperparams(option.dataset.hyperparams);
+          applyRunParams(form, params);
+        }
+      }
+      updateLock();
+    };
+
+    const syncOptions = () => {
+      filterRunOptions(select, resolveModelFamily());
+      const selectedOption = select.options[select.selectedIndex];
+      if (select.value && selectedOption && selectedOption.disabled) {
+        select.value = "";
+      }
+      applySelection();
+    };
+
+    if (modelSelect) {
+      modelSelect.addEventListener("change", () => {
+        syncOptions();
+      });
+    }
+
+    if (scopeSelect) {
+      scopeSelect.addEventListener("change", () => {
+        if (isGlobalScope()) {
+          syncOptions();
+        } else {
+          updateLock();
+        }
+      });
+    }
+
+    if (deleteButton && deleteForm) {
+      deleteButton.addEventListener("click", () => {
+        if (!select.value) {
+          return;
+        }
+        const confirmed = window.confirm(
+          "Delete this global model? This removes stored files and forecasts.",
+        );
+        if (!confirmed) {
+          return;
+        }
+        deleteForm.submit();
+      });
+    }
+
+    select.addEventListener("change", () => {
+      applySelection();
+    });
+
+    syncOptions();
+  };
+
+  document.querySelectorAll("form").forEach((form) => {
+    initGlobalModelSelector(form);
+  });
+
   document.querySelectorAll("input[data-range-output]").forEach((input) => {
     const selector = input.dataset.rangeOutput;
     if (!selector) {

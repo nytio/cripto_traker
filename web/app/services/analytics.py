@@ -34,18 +34,43 @@ def compute_indicators(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         select
             date,
             price,
-            avg(price) over (order by date rows between 6 preceding and current row) as sma_7,
-            avg(price) over (order by date rows between 29 preceding and current row) as sma_30,
-            avg(price) over (order by date rows between 19 preceding and current row) as sma_20,
-            stddev_samp(price) over (order by date rows between 19 preceding and current row) as std_20
-        from prices
+            sma_7,
+            sma_50,
+            sma_20,
+            std_20,
+            case
+                when cnt_20 = 20 then sma_20 + (std_20 * 2)
+                else null
+            end as bb_upper,
+            case
+                when cnt_20 = 20 then sma_20 - (std_20 * 2)
+                else null
+            end as bb_lower
+        from (
+            select
+                date,
+                price,
+                avg(price) over (
+                    order by date rows between 6 preceding and current row
+                ) as sma_7,
+                avg(price) over (
+                    order by date rows between 49 preceding and current row
+                ) as sma_50,
+                avg(price) over (
+                    order by date rows between 19 preceding and current row
+                ) as sma_20,
+                stddev_pop(price) over (
+                    order by date rows between 19 preceding and current row
+                ) as std_20,
+                count(*) over (
+                    order by date rows between 19 preceding and current row
+                ) as cnt_20
+            from prices
+        )
         order by date
         """
     ).df()
     con.close()
-
-    result["bb_upper"] = result["sma_20"] + (result["std_20"] * 2)
-    result["bb_lower"] = result["sma_20"] - (result["std_20"] * 2)
 
     result["date"] = result["date"].dt.strftime("%Y-%m-%d")
     result = result.astype(object).where(pd.notnull(result), None)

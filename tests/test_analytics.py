@@ -24,7 +24,8 @@ def test_merge_prophet_forecast_appends_rows():
             "date": "2024-01-01",
             "price": 1.0,
             "sma_7": 1.0,
-            "sma_30": None,
+            "sma_50": None,
+            "sma_20": None,
             "bb_upper": None,
             "bb_lower": None,
         }

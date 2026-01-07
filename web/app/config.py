@@ -68,6 +68,8 @@ class Config:
         )
         rnn_days_raw = os.environ.get("RNN_FUTURE_DAYS", "30").strip()
         self.RNN_FUTURE_DAYS = int(rnn_days_raw) if rnn_days_raw.isdigit() else 30
+        darts_work_dir = os.environ.get("DARTS_WORK_DIR", "").strip()
+        self.DARTS_WORK_DIR = darts_work_dir or "/var/lib/app/darts"
         self.LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
         self.WTF_CSRF_TIME_LIMIT = 3600
         self.SESSION_COOKIE_HTTPONLY = True

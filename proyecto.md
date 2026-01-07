@@ -263,7 +263,7 @@ Crear una estructura clara y extendible:
 ### 8.2 Requisitos funcionales de la gráfica
 
 1. **Interactividad**: hover con valores, leyenda clara, zoom/pan (especialmente con Plotly).  
-2. **Indicadores**: permitir activar/desactivar (p. ej. SMA 7 y SMA 30, bandas de Bollinger).  
+2. **Indicadores**: permitir activar/desactivar (p. ej. SMA 7 y SMA 20, bandas de Bollinger).  
 3. **Tendencias/anotaciones**:
    - MVP: mostrar líneas calculadas (p. ej. tendencia lineal) si se decide.
    - Futuro: dibujo por usuario (si se adopta librería especializada/D3).
