@@ -98,7 +98,7 @@
                     {% if row.bollinger_percent is not none %}
                       <div class="fw-semibold">{{ "{:.0f}".format(row.bollinger_percent * 100) }}</div>
                       {% if row.bollinger_bandwidth is not none %}
-                        <div class="text-muted small">{{ "{:.3f}".format(row.bollinger_bandwidth) }}</div>
+                        <div class="text-muted small">{{ "{:.2f}".format(row.bollinger_bandwidth) }}</div>
                       {% endif %}
                     {% else %}
                       <span class="text-muted">--</span>
@@ -108,7 +108,7 @@
                     {% if row.prophet_percent is not none %}
                       <div class="fw-semibold">{{ "{:.1f}".format(row.prophet_percent * 100) }}</div>
                       {% if row.sma_spread is not none %}
-                        <div class="text-muted small">{{ "{:.3f}".format(row.sma_spread) }}</div>
+                        <div class="text-muted small">{{ "{:.2f}".format(row.sma_spread) }}</div>
                       {% endif %}
                     {% endif %}
                   </td>
