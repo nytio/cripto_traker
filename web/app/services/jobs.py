@@ -34,7 +34,10 @@ def start_job(
                 "job_type": job_type,
                 "label": label,
                 "state": "busy",
-                "message": f"{active_label} update already running.",
+                "message": (
+                    "Update not started because "
+                    f"{active_label} update is already running."
+                ),
                 "active_job_key": running_job.get("job_key"),
                 "active_job_type": running_job.get("job_type"),
                 "active_label": active_label,

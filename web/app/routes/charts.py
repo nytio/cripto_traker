@@ -25,6 +25,13 @@ from ..services.prophet import (
     fetch_prophet_meta,
     store_prophet_forecast,
 )
+from ..services.prophet_defaults import (
+    PROPHET_DEFAULT_CHANGEPOINT,
+    PROPHET_DEFAULT_CHANGEPOINT_RANGE,
+    PROPHET_DEFAULT_SEASONALITY,
+    PROPHET_DEFAULT_YEARLY,
+    resolve_prophet_defaults,
+)
 from ..services.rnn import (
     fetch_gru_forecast,
     fetch_gru_meta,
@@ -248,6 +255,7 @@ def crypto_detail(crypto_id: int):
         .scalars()
         .all()
     )
+    prophet_defaults = resolve_prophet_defaults(days, max_days)
     return render_template(
         "crypto_detail.html",
         crypto=crypto,
@@ -267,6 +275,7 @@ def crypto_detail(crypto_id: int):
         days=days,
         max_days=max_days,
         backfill_max_days=backfill_max_days,
+        prophet_defaults=prophet_defaults,
         lstm_global_runs=lstm_global_runs,
         gru_global_runs=gru_global_runs,
     )
@@ -389,7 +398,11 @@ def recalculate_prophet(crypto_id: int):
     max_days = current_app.config["MAX_HISTORY_DAYS"]
     prophet_days_raw = request.form.get("prophet_days", "").strip()
     prophet_days = clamp_days(prophet_days_raw, max_days)
-    yearly_raw = request.form.get("prophet_yearly", "").strip().lower()
+    yearly_raw = (
+        request.form.get("prophet_yearly", PROPHET_DEFAULT_YEARLY)
+        .strip()
+        .lower()
+    )
     if yearly_raw == "false":
         yearly_seasonality: bool | str = False
     elif yearly_raw == "auto":
@@ -406,7 +419,7 @@ def recalculate_prophet(crypto_id: int):
             "0.1": 0.1,
             "0.5": 0.5,
         },
-        0.001,
+        PROPHET_DEFAULT_CHANGEPOINT,
     )
     seasonality_scale = _parse_float_choice(
         request.form.get("prophet_seasonality"),
@@ -416,11 +429,11 @@ def recalculate_prophet(crypto_id: int):
             "1.0": 1.0,
             "10.0": 10.0,
         },
-        1.0,
+        PROPHET_DEFAULT_SEASONALITY,
     )
     changepoint_range = _parse_float_range(
         request.form.get("prophet_changepoint_range"),
-        0.9,
+        PROPHET_DEFAULT_CHANGEPOINT_RANGE,
         0.8,
         0.95,
     )
@@ -446,6 +459,8 @@ def recalculate_prophet(crypto_id: int):
                 raise RuntimeError("Prophet forecast not available")
             return stored
         finally:
+            # Avoid holding ProphetForecast objects on the session.
+            job_session.expunge_all()
             job_session.close()
 
     job = start_job(job_key, job_type, JOB_LABELS[job_type], run_prophet)

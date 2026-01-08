@@ -10,6 +10,16 @@ def test_dashboard_ok(auth_client):
     assert response.status_code == 200
 
 
+def test_dashboard_prophet_bulk_disabled(auth_client):
+    response = auth_client.post(
+        "/prophet/bulk", headers={"Accept": "application/json"}
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["state"] == "error"
+    assert payload["message"] == "Prophet forecast disabled"
+
+
 def test_health_requires_login(client):
     response = client.get("/api/health")
     assert response.status_code == 401

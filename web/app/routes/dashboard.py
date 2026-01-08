@@ -1,11 +1,51 @@
-from flask import Blueprint, current_app, g, render_template
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from sqlalchemy import select
 
 from ..db import get_session
 from ..models import Cryptocurrency, Price, ProphetForecast, UserCrypto
 from ..services.analytics import compute_indicators
+from ..services.jobs import get_job_status, start_job
+from ..services.prophet import store_prophet_forecast
+from ..services.prophet_defaults import resolve_prophet_defaults
+from ..services.series import fetch_price_series
 
 bp = Blueprint("dashboard", __name__)
+
+PROPHET_BULK_JOB_TYPE = "prophet_bulk"
+PROPHET_BULK_LABEL = "Prophet (all)"
+
+
+def _prophet_bulk_job_key(user_id: int) -> str:
+    return f"{PROPHET_BULK_JOB_TYPE}:{user_id}"
+
+
+def _dashboard_job_response(job: dict[str, object]):
+    accept_header = request.headers.get("Accept", "")
+    if "application/json" in accept_header:
+        status_code = 202 if job.get("state") == "running" else 200
+        return jsonify(job), status_code
+
+    state = job.get("state")
+    message = job.get("message") or "Update queued."
+    if state == "done":
+        flash(message, "success")
+    elif state in {"error"}:
+        flash(message, "error")
+    elif state == "busy":
+        flash(message, "warning")
+    else:
+        flash(message, "info")
+    return redirect(url_for("dashboard.index"))
 
 
 def _latest_bollinger_indicators(
@@ -110,3 +150,91 @@ def index():
 
     currency = current_app.config["COINGECKO_VS_CURRENCY"].upper()
     return render_template("dashboard.html", rows=rows, currency=currency)
+
+
+@bp.post("/prophet/bulk")
+def recalculate_prophet_bulk():
+    job_type = PROPHET_BULK_JOB_TYPE
+    horizon_days = current_app.config.get("PROPHET_FUTURE_DAYS", 30)
+    if horizon_days <= 0:
+        job = {
+            "job_key": _prophet_bulk_job_key(g.user.id),
+            "job_type": job_type,
+            "label": PROPHET_BULK_LABEL,
+            "state": "error",
+            "message": "Prophet forecast disabled",
+        }
+        return _dashboard_job_response(job)
+
+    session = get_session()
+    crypto_ids = (
+        session.execute(
+            select(Cryptocurrency.id)
+            .join(UserCrypto, UserCrypto.crypto_id == Cryptocurrency.id)
+            .where(UserCrypto.user_id == g.user.id)
+        )
+        .scalars()
+        .all()
+    )
+    if not crypto_ids:
+        job = {
+            "job_key": _prophet_bulk_job_key(g.user.id),
+            "job_type": job_type,
+            "label": PROPHET_BULK_LABEL,
+            "state": "error",
+            "message": "No assets to update.",
+        }
+        return _dashboard_job_response(job)
+
+    max_days = current_app.config["MAX_HISTORY_DAYS"]
+    defaults = resolve_prophet_defaults(None, max_days)
+    prophet_days = int(defaults["days"])
+    yearly_raw = str(defaults["yearly"])
+    if yearly_raw == "false":
+        yearly_seasonality: bool | str = False
+    elif yearly_raw == "auto":
+        yearly_seasonality = "auto"
+    else:
+        yearly_seasonality = True
+    changepoint_scale = float(defaults["changepoint"])
+    seasonality_scale = float(defaults["seasonality"])
+    changepoint_range = float(defaults["changepoint_range"])
+    job_key = _prophet_bulk_job_key(g.user.id)
+
+    def run_prophet_bulk():
+        job_session = get_session()
+        total_points = 0
+        try:
+            for crypto_id in crypto_ids:
+                rows = fetch_price_series(job_session, crypto_id, prophet_days)
+                if len(rows) < 2:
+                    # Drop ORM state between cryptos to keep memory flat in bulk runs.
+                    job_session.expunge_all()
+                    continue
+                stored = store_prophet_forecast(
+                    job_session,
+                    crypto_id,
+                    rows,
+                    horizon_days,
+                    yearly_seasonality=yearly_seasonality,
+                    changepoint_prior_scale=changepoint_scale,
+                    seasonality_prior_scale=seasonality_scale,
+                    changepoint_range=changepoint_range,
+                )
+                total_points += stored
+                job_session.expunge_all()
+            if total_points <= 0:
+                raise RuntimeError("Prophet forecast not available")
+            return total_points
+        finally:
+            job_session.close()
+
+    job = start_job(job_key, job_type, PROPHET_BULK_LABEL, run_prophet_bulk)
+    return _dashboard_job_response(job)
+
+
+@bp.get("/jobs/prophet-bulk")
+def prophet_bulk_status():
+    job_key = _prophet_bulk_job_key(g.user.id)
+    job = get_job_status(job_key, PROPHET_BULK_JOB_TYPE, PROPHET_BULK_LABEL)
+    return jsonify(job)

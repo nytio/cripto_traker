@@ -25,6 +25,12 @@
           Update prices
         </button>
       </form>
+      <form method="post" action="{{ url_for('dashboard.recalculate_prophet_bulk') }}" data-loading="1" data-async="1" data-async-message="Prophet updates are running in the background." data-async-done-message="Prophet updated. Refreshing data." data-job-type="prophet_bulk" data-job-group="forecast" data-job-label="Prophet (all)" data-job-status-url="{{ url_for('dashboard.prophet_bulk_status') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-sm btn-outline-primary" data-loading-text="Updating..." data-loading-spinner="1">
+          Update Prophets
+        </button>
+      </form>
       <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('cryptos.new_crypto') }}">
         Add crypto
       </a>
@@ -126,6 +132,9 @@
               {% endfor %}
             </tbody>
           </table>
+        </div>
+        <div class="border-top p-3 text-muted small">
+          Prophet uses default settings for all tracked assets.
         </div>
       {% else %}
         <div class="p-4 text-center">
