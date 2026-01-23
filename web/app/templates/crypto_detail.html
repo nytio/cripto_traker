@@ -288,6 +288,17 @@
                   </option>
                 {% endfor %}
               </select>
+              <div class="mt-2" data-global-create-only="1" hidden>
+                <label for="lstm-crypto-ids" class="form-label">Training cryptos (create new)</label>
+                <select class="form-select" id="lstm-crypto-ids" name="lstm_crypto_ids" multiple size="6">
+                  {% for listed_crypto in all_cryptos %}
+                    <option value="{{ listed_crypto.id }}" {% if listed_crypto.id == crypto.id %}selected{% endif %}>
+                      {{ listed_crypto.name }} ({{ listed_crypto.symbol|upper }})
+                    </option>
+                  {% endfor %}
+                </select>
+                <div class="form-text">Use Ctrl/Cmd to select multiple. Applies only when creating a new shared model.</div>
+              </div>
               <div class="form-check mt-2" data-global-retrain="1" hidden>
                 <input class="form-check-input" type="checkbox" value="1" id="lstm-retrain" name="lstm_retrain" checked>
                 <label class="form-check-label" for="lstm-retrain">Train before predicting</label>
@@ -453,6 +464,17 @@
                   </option>
                 {% endfor %}
               </select>
+              <div class="mt-2" data-global-create-only="1" hidden>
+                <label for="gru-crypto-ids" class="form-label">Training cryptos (create new)</label>
+                <select class="form-select" id="gru-crypto-ids" name="gru_crypto_ids" multiple size="6">
+                  {% for listed_crypto in all_cryptos %}
+                    <option value="{{ listed_crypto.id }}" {% if listed_crypto.id == crypto.id %}selected{% endif %}>
+                      {{ listed_crypto.name }} ({{ listed_crypto.symbol|upper }})
+                    </option>
+                  {% endfor %}
+                </select>
+                <div class="form-text">Use Ctrl/Cmd to select multiple. Applies only when creating a new shared model.</div>
+              </div>
               <div class="form-check mt-2" data-global-retrain="1" hidden>
                 <input class="form-check-input" type="checkbox" value="1" id="gru-retrain" name="gru_retrain" checked>
                 <label class="form-check-label" for="gru-retrain">Train before predicting</label>

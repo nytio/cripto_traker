@@ -106,6 +106,60 @@ def _covariate_kwargs(model, covariates) -> dict[str, Any]:
     return {}
 
 
+def _val_covariate_kwargs(model, covariates) -> dict[str, Any]:
+    base = _covariate_kwargs(model, covariates)
+    if "future_covariates" in base:
+        return {"val_future_covariates": base["future_covariates"]}
+    if "past_covariates" in base:
+        return {"val_past_covariates": base["past_covariates"]}
+    return {}
+
+
+def _min_required_length(
+    model_kind: str,
+    input_chunk_length: int,
+    output_chunk_length: int,
+    training_length: int,
+) -> int:
+    if model_kind == "rnn":
+        base = max(input_chunk_length, training_length)
+        return base + max(1, output_chunk_length)
+    return input_chunk_length + max(1, output_chunk_length)
+
+
+def _resolve_val_split(
+    desired: float, series_len: int, min_required: int
+) -> float:
+    if desired <= 0 or series_len <= 0:
+        return 0.0
+    ratio = min(0.5, max(0.0, desired))
+    if min_required <= 0:
+        return ratio
+    min_ratio = min_required / series_len
+    max_ratio = (series_len - min_required) / series_len
+    if min_ratio > max_ratio or max_ratio <= 0:
+        return 0.0
+    if ratio < min_ratio:
+        ratio = min_ratio
+    if ratio > max_ratio:
+        ratio = max_ratio
+    val_len = int(series_len * ratio)
+    train_len = series_len - val_len
+    if val_len < min_required or train_len < min_required:
+        return 0.0
+    return ratio
+
+
+def _split_series(series, val_split: float):
+    if val_split <= 0:
+        return series, None
+    ratio = min(0.5, max(0.0, val_split))
+    if ratio <= 0:
+        return series, None
+    train, val = series.split_before(1 - ratio)
+    return train, val if len(val) else None
+
+
 def _extract_points(series) -> list[tuple[date, float]]:
     values = series.values().reshape(-1)
     dates = series.time_index
@@ -146,6 +200,7 @@ def _train_rnn(
     hidden_dim: int = 64,
     n_rnn_layers: int = 2,
     hidden_fc_sizes: list[int] | None = None,
+    val_split: float = 0.2,
 ):
     series_len = len(series)
     output_chunk = 1 if model_kind == "rnn" else max(1, output_chunk_length)
@@ -158,6 +213,57 @@ def _train_rnn(
         )
         if training_length <= input_chunk:
             training_length = min(series_len, input_chunk + max(1, horizon_days))
+
+    base_input_chunk = input_chunk
+    base_output_chunk = output_chunk
+    base_training_length = training_length
+
+    min_required = _min_required_length(
+        model_kind,
+        input_chunk,
+        output_chunk,
+        training_length,
+    )
+    effective_val_split = _resolve_val_split(
+        val_split, series_len, min_required
+    )
+    train_series, val_series = _split_series(series, effective_val_split)
+    train_covariates = covariates
+    val_covariates = None
+    if covariates is not None and val_series is not None:
+        split_point = val_series.time_index[0]
+        train_covariates, val_covariates = covariates.split_before(
+            split_point
+        )
+    if len(train_series) < 5:
+        train_series = series
+        val_series = None
+        train_covariates = covariates
+        val_covariates = None
+
+    train_len = len(train_series)
+    input_chunk, output_chunk = _resolve_chunk_lengths(
+        train_len, input_chunk, output_chunk
+    )
+    if model_kind == "rnn":
+        training_length = _resolve_training_length(
+            train_len, input_chunk, training_length
+        )
+
+    min_required = _min_required_length(
+        model_kind,
+        input_chunk,
+        output_chunk,
+        training_length,
+    )
+    if val_series is not None and len(val_series) < min_required:
+        train_series = series
+        val_series = None
+        train_covariates = covariates
+        val_covariates = None
+        input_chunk = base_input_chunk
+        output_chunk = base_output_chunk
+        training_length = base_training_length
 
     trainer_kwargs = {
         "accelerator": "cpu",
@@ -214,7 +320,32 @@ def _train_rnn(
             hidden_dim=hidden_dim,
             **model_kwargs,
         )
-    model.fit(series, **_covariate_kwargs(model, covariates), verbose=False)
+    covariate_payload = _covariate_kwargs(model, train_covariates)
+    val_covariate_payload = _val_covariate_kwargs(model, val_covariates)
+    if val_series is not None:
+        try:
+            model.fit(
+                train_series,
+                val_series=val_series,
+                **covariate_payload,
+                **val_covariate_payload,
+                verbose=False,
+            )
+        except ValueError as exc:
+            message = str(exc).lower()
+            if "validation time series dataset is too short" in message:
+                logger.warning(
+                    "Validation set rejected by Darts; retrying without val."
+                )
+                model.fit(
+                    train_series,
+                    **covariate_payload,
+                    verbose=False,
+                )
+            else:
+                raise
+    else:
+        model.fit(train_series, **covariate_payload, verbose=False)
     return model, input_chunk, output_chunk
 
 

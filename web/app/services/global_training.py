@@ -137,10 +137,47 @@ def _series_width(series) -> int | None:
     return getattr(series, "n_components", None)
 
 
+def _min_required_length(
+    model_family: str,
+    input_chunk_length: int,
+    output_chunk_length: int,
+    training_length: int,
+) -> int:
+    if model_family == "RNNModel":
+        base = max(input_chunk_length, training_length)
+        return base + max(1, output_chunk_length)
+    return input_chunk_length + max(1, output_chunk_length)
+
+
+def _resolve_val_split(
+    desired: float, min_series_len: int, min_required: int
+) -> float:
+    if desired <= 0 or min_series_len <= 0:
+        return 0.0
+    ratio = min(0.5, max(0.0, desired))
+    if min_required <= 0:
+        return ratio
+    min_ratio = min_required / min_series_len
+    max_ratio = (min_series_len - min_required) / min_series_len
+    if min_ratio > max_ratio or max_ratio <= 0:
+        return 0.0
+    if ratio < min_ratio:
+        ratio = min_ratio
+    if ratio > max_ratio:
+        ratio = max_ratio
+    val_len = int(min_series_len * ratio)
+    train_len = min_series_len - val_len
+    if val_len < min_required or train_len < min_required:
+        return 0.0
+    return ratio
+
+
 def _split_series(series, val_split: float):
     if val_split <= 0:
         return series, None
-    ratio = min(0.5, max(0.05, val_split))
+    ratio = min(0.5, max(0.0, val_split))
+    if ratio <= 0:
+        return series, None
     train, val = series.split_before(1 - ratio)
     return train, val if len(val) else None
 
@@ -164,7 +201,127 @@ def train_global_model(
         raise ValueError("No crypto ids provided for training.")
 
     hyperparams = dict(hyperparams or {})
-    val_split = float(hyperparams.get("val_split", 0.2))
+    requested_val_split = float(hyperparams.get("val_split", 0.2))
+
+    series_payloads = []
+    for crypto_id in crypto_ids:
+        rows = fetch_price_series(session, crypto_id, training_days)
+        price_df = _build_price_frame(rows)
+        if price_df is None or len(price_df) < 6:
+            continue
+        series = _build_return_series(price_df)
+        if series is None or len(series) < 6:
+            continue
+        covariates = _build_covariates(rows, horizon_days)
+        series_payloads.append(
+            {
+                "crypto_id": crypto_id,
+                "series": series,
+                "covariates": covariates,
+                "cutoff_date": price_df["date"].iloc[-1].date(),
+            }
+        )
+
+    if not series_payloads:
+        raise ValueError("Not enough data to train a global model.")
+
+    base_input_chunk_length = int(hyperparams.get("input_chunk_length", 180))
+    base_output_chunk_length = int(
+        hyperparams.get("output_chunk_length", horizon_days)
+    )
+    base_training_length = int(
+        hyperparams.get(
+            "training_length", base_input_chunk_length + horizon_days
+        )
+    )
+    n_rnn_layers = int(hyperparams.get("n_rnn_layers", 2))
+    hidden_dim = int(hyperparams.get("hidden_dim", 64))
+    hidden_fc_sizes = hyperparams.get("hidden_fc_sizes", [64, 32])
+    n_epochs = int(hyperparams.get("n_epochs", 200))
+    batch_size = int(hyperparams.get("batch_size", 64))
+    random_state = int(hyperparams.get("random_state", 42))
+
+    output_for_chunks = base_output_chunk_length
+    if model_family == "RNNModel":
+        output_for_chunks = 1
+
+    def _resolve_sizing(
+        min_len: int,
+    ) -> tuple[int, int, int, int, float]:
+        input_chunk_length = base_input_chunk_length
+        output_chunk_length = base_output_chunk_length
+        training_length = base_training_length
+
+        input_chunk, output_chunk = _resolve_chunk_lengths(
+            min_len, input_chunk_length, output_for_chunks
+        )
+        input_chunk_length = input_chunk
+        output_chunk_length = output_chunk
+        if model_family == "RNNModel":
+            training_length = _resolve_training_length(
+                min_len, input_chunk_length, training_length
+            )
+
+        min_required = _min_required_length(
+            model_family,
+            input_chunk_length,
+            output_chunk_length,
+            training_length,
+        )
+        val_split = _resolve_val_split(
+            requested_val_split, min_len, min_required
+        )
+        min_train_len = (
+            int(min_len * (1 - val_split)) if val_split > 0 else min_len
+        )
+        if min_train_len < min_len:
+            input_chunk, output_chunk = _resolve_chunk_lengths(
+                min_train_len, input_chunk_length, output_for_chunks
+            )
+            input_chunk_length = input_chunk
+            output_chunk_length = output_chunk
+            if model_family == "RNNModel":
+                training_length = _resolve_training_length(
+                    min_train_len, input_chunk_length, training_length
+                )
+        min_required = _min_required_length(
+            model_family,
+            input_chunk_length,
+            output_chunk_length,
+            training_length,
+        )
+        return (
+            input_chunk_length,
+            output_chunk_length,
+            training_length,
+            min_required,
+            val_split,
+        )
+
+    filtered_payloads = series_payloads
+    while True:
+        min_series_len = min(
+            len(payload["series"]) for payload in filtered_payloads
+        )
+        (
+            input_chunk_length,
+            output_chunk_length,
+            training_length,
+            min_required,
+            val_split,
+        ) = _resolve_sizing(min_series_len)
+        kept_payloads = []
+        for payload in filtered_payloads:
+            train_series, _ = _split_series(payload["series"], val_split)
+            if len(train_series) < 5:
+                continue
+            kept_payloads.append(payload)
+        if not kept_payloads:
+            raise ValueError("Not enough data to train a global model.")
+        if len(kept_payloads) == len(filtered_payloads):
+            series_payloads = kept_payloads
+            break
+        filtered_payloads = kept_payloads
 
     train_series_list = []
     val_series_list = []
@@ -175,18 +332,10 @@ def train_global_model(
     train_end_date: date | None = None
     cutoff_date: date | None = None
 
-    for crypto_id in crypto_ids:
-        rows = fetch_price_series(session, crypto_id, training_days)
-        price_df = _build_price_frame(rows)
-        if price_df is None or len(price_df) < 6:
-            continue
-        series = _build_return_series(price_df)
-        if series is None or len(series) < 6:
-            continue
+    for payload in series_payloads:
+        series = payload["series"]
         train_series, val_series = _split_series(series, val_split)
-        if len(train_series) < 5:
-            continue
-        covariates = _build_covariates(rows, horizon_days)
+        covariates = payload["covariates"]
         if covariates is not None and val_series is not None:
             split_point = val_series.time_index[0]
             train_covariates, val_covariates = covariates.split_before(
@@ -199,11 +348,11 @@ def train_global_model(
         val_series_list.append(val_series)
         train_covariates_list.append(train_covariates)
         val_covariates_list.append(val_covariates)
-        used_crypto_ids.append(crypto_id)
+        used_crypto_ids.append(payload["crypto_id"])
 
         start_date = train_series.time_index[0].date()
         end_date = train_series.time_index[-1].date()
-        series_cutoff = price_df["date"].iloc[-1].date()
+        series_cutoff = payload["cutoff_date"]
         train_start_date = (
             start_date
             if train_start_date is None
@@ -220,32 +369,6 @@ def train_global_model(
 
     if not train_series_list:
         raise ValueError("Not enough data to train a global model.")
-
-    min_series_len = min(len(series) for series in train_series_list)
-    input_chunk_length = int(hyperparams.get("input_chunk_length", 180))
-    output_chunk_length = int(hyperparams.get("output_chunk_length", horizon_days))
-    training_length = int(
-        hyperparams.get("training_length", input_chunk_length + horizon_days)
-    )
-    n_rnn_layers = int(hyperparams.get("n_rnn_layers", 2))
-    hidden_dim = int(hyperparams.get("hidden_dim", 64))
-    hidden_fc_sizes = hyperparams.get("hidden_fc_sizes", [64, 32])
-    n_epochs = int(hyperparams.get("n_epochs", 200))
-    batch_size = int(hyperparams.get("batch_size", 64))
-    random_state = int(hyperparams.get("random_state", 42))
-
-    output_for_chunks = output_chunk_length
-    if model_family == "RNNModel":
-        output_for_chunks = 1
-    input_chunk, output_chunk = _resolve_chunk_lengths(
-        min_series_len, input_chunk_length, output_for_chunks
-    )
-    input_chunk_length = input_chunk
-    output_chunk_length = output_chunk
-    if model_family == "RNNModel":
-        training_length = _resolve_training_length(
-            min_series_len, input_chunk_length, training_length
-        )
 
     effective_hyperparams = {
         "input_chunk_length": input_chunk_length,
@@ -365,6 +488,9 @@ def train_global_model(
         val_covariates_list if all(val_covariates_list) else None,
     )
     use_val = all(series is not None for series in val_series_list)
+    if use_val and any(len(series) < min_required for series in val_series_list):
+        logger.warning("Validation split too short; skipping val.")
+        use_val = False
     if use_val and all(train_covariates_list) and not all(val_covariates_list):
         logger.warning("Validation covariates incomplete; skipping val.")
         use_val = False
@@ -379,6 +505,7 @@ def train_global_model(
             )
             use_val = False
     if use_val:
+        actual_use_val = True
         try:
             model.fit(
                 train_series_list,
@@ -402,14 +529,19 @@ def train_global_model(
                     **covariate_payload,
                     verbose=False,
                 )
+                actual_use_val = False
             else:
                 raise
     else:
+        actual_use_val = False
         model.fit(
             train_series_list,
             **covariate_payload,
             verbose=False,
         )
+
+    if not actual_use_val and effective_hyperparams["val_split"] != 0.0:
+        effective_hyperparams["val_split"] = 0.0
 
     model.save(artifact_path_pt)
     if update_run is not None:

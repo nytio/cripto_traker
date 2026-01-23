@@ -425,6 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const modelSelect = form.querySelector("[data-rnn-model-select='1']");
     const scopeSelect = form.querySelector("[data-forecast-scope-select='1']");
     const deleteButton = form.querySelector("[data-global-delete-button='1']");
+    const createOnlyBlocks = form.querySelectorAll("[data-global-create-only='1']");
     const deleteFormId = deleteButton
       ? deleteButton.dataset.globalDeleteForm
       : "";
@@ -466,11 +467,21 @@ document.addEventListener("DOMContentLoaded", () => {
         retrainInput.disabled = !show;
       }
     };
+    const updateCreateOnlyState = () => {
+      const show = isGlobalScope() && !select.value;
+      createOnlyBlocks.forEach((block) => {
+        block.hidden = !show;
+        block.querySelectorAll("input, select, textarea").forEach((input) => {
+          input.disabled = !show;
+        });
+      });
+    };
     const updateLock = () => {
       const locked = isGlobalScope() && Boolean(select.value);
       setParamLock(form, locked);
       updateDeleteState();
       updateRetrainState();
+      updateCreateOnlyState();
     };
 
     const applySelection = () => {

@@ -185,6 +185,36 @@ def _parse_optional_int(value: str | None) -> int | None:
     return parsed
 
 
+def _parse_id_list(values: list[str]) -> list[int]:
+    parsed = []
+    seen = set()
+    for raw in values:
+        token = raw.strip()
+        if not token or not token.isdigit():
+            continue
+        value = int(token)
+        if value <= 0 or value in seen:
+            continue
+        parsed.append(value)
+        seen.add(value)
+    return parsed
+
+
+def _filter_existing_crypto_ids(
+    session, crypto_ids: list[int]
+) -> list[int]:
+    if not crypto_ids:
+        return []
+    existing_ids = set(
+        session.execute(
+            select(Cryptocurrency.id).where(
+                Cryptocurrency.id.in_(crypto_ids)
+            )
+        ).scalars()
+    )
+    return [cid for cid in crypto_ids if cid in existing_ids]
+
+
 @bp.get("/cryptos/<int:crypto_id>")
 def crypto_detail(crypto_id: int):
     session = get_session()
@@ -195,6 +225,9 @@ def crypto_detail(crypto_id: int):
     ).scalar_one_or_none()
     if not crypto:
         abort(404)
+    all_cryptos = session.execute(
+        select(Cryptocurrency).order_by(Cryptocurrency.name)
+    ).scalars().all()
 
     max_days = current_app.config["MAX_HISTORY_DAYS"]
     backfill_max_days = min(365, max_days)
@@ -278,6 +311,7 @@ def crypto_detail(crypto_id: int):
         prophet_defaults=prophet_defaults,
         lstm_global_runs=lstm_global_runs,
         gru_global_runs=gru_global_runs,
+        all_cryptos=all_cryptos,
     )
 
 
@@ -504,6 +538,9 @@ def recalculate_lstm(crypto_id: int):
     lstm_run_id = _parse_optional_int(
         request.form.get("lstm_global_model_run_id")
     )
+    lstm_crypto_ids = _filter_existing_crypto_ids(
+        session, _parse_id_list(request.form.getlist("lstm_crypto_ids"))
+    )
     lstm_retrain = request.form.get("lstm_retrain") is not None
     lstm_input_default = 180
     lstm_input_chunk = _parse_int_range(
@@ -558,6 +595,20 @@ def recalculate_lstm(crypto_id: int):
                     selected_run = job_session.get(
                         ForecastModelRun, lstm_run_id
                     )
+                training_crypto_ids = lstm_crypto_ids or [crypto_id]
+                if selected_run is not None:
+                    stored_ids = _parse_id_list(
+                        [
+                            str(value)
+                            for value in (
+                                selected_run.training_crypto_ids or []
+                            )
+                        ]
+                    )
+                    training_crypto_ids = stored_ids or [crypto_id]
+                training_crypto_ids = _filter_existing_crypto_ids(
+                    job_session, training_crypto_ids
+                ) or [crypto_id]
                 model_family = (
                     selected_run.model_family
                     if selected_run is not None
@@ -592,7 +643,7 @@ def recalculate_lstm(crypto_id: int):
                         model_family=selected_run.model_family,
                         cell_type="LSTM",
                         hyperparams=retrain_hyperparams,
-                        crypto_ids=[crypto_id],
+                        crypto_ids=training_crypto_ids,
                         training_days=lstm_days,
                         horizon_days=horizon_days,
                         transform=selected_run.transform,
@@ -608,7 +659,7 @@ def recalculate_lstm(crypto_id: int):
                         model_family=model_family,
                         cell_type="LSTM",
                         hyperparams=hyperparams,
-                        crypto_ids=[crypto_id],
+                        crypto_ids=training_crypto_ids,
                         training_days=lstm_days,
                         horizon_days=horizon_days,
                         transform="log_return",
@@ -634,7 +685,7 @@ def recalculate_lstm(crypto_id: int):
                         model_family=fallback_family,
                         cell_type="LSTM",
                         hyperparams=fallback_params,
-                        crypto_ids=[crypto_id],
+                        crypto_ids=training_crypto_ids,
                         training_days=lstm_days,
                         horizon_days=horizon_days,
                         transform=fallback_transform,
@@ -713,6 +764,9 @@ def recalculate_gru(crypto_id: int):
     gru_run_id = _parse_optional_int(
         request.form.get("gru_global_model_run_id")
     )
+    gru_crypto_ids = _filter_existing_crypto_ids(
+        session, _parse_id_list(request.form.getlist("gru_crypto_ids"))
+    )
     gru_retrain = request.form.get("gru_retrain") is not None
     gru_input_default = 180
     gru_input_chunk = _parse_int_range(
@@ -767,6 +821,20 @@ def recalculate_gru(crypto_id: int):
                     selected_run = job_session.get(
                         ForecastModelRun, gru_run_id
                     )
+                training_crypto_ids = gru_crypto_ids or [crypto_id]
+                if selected_run is not None:
+                    stored_ids = _parse_id_list(
+                        [
+                            str(value)
+                            for value in (
+                                selected_run.training_crypto_ids or []
+                            )
+                        ]
+                    )
+                    training_crypto_ids = stored_ids or [crypto_id]
+                training_crypto_ids = _filter_existing_crypto_ids(
+                    job_session, training_crypto_ids
+                ) or [crypto_id]
                 model_family = (
                     selected_run.model_family
                     if selected_run is not None
@@ -801,7 +869,7 @@ def recalculate_gru(crypto_id: int):
                         model_family=selected_run.model_family,
                         cell_type="GRU",
                         hyperparams=retrain_hyperparams,
-                        crypto_ids=[crypto_id],
+                        crypto_ids=training_crypto_ids,
                         training_days=gru_days,
                         horizon_days=horizon_days,
                         transform=selected_run.transform,
@@ -817,7 +885,7 @@ def recalculate_gru(crypto_id: int):
                         model_family=model_family,
                         cell_type="GRU",
                         hyperparams=hyperparams,
-                        crypto_ids=[crypto_id],
+                        crypto_ids=training_crypto_ids,
                         training_days=gru_days,
                         horizon_days=horizon_days,
                         transform="log_return",
@@ -843,7 +911,7 @@ def recalculate_gru(crypto_id: int):
                         model_family=fallback_family,
                         cell_type="GRU",
                         hyperparams=fallback_params,
-                        crypto_ids=[crypto_id],
+                        crypto_ids=training_crypto_ids,
                         training_days=gru_days,
                         horizon_days=horizon_days,
                         transform=fallback_transform,
