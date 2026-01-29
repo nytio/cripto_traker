@@ -513,7 +513,7 @@
     {% endif %}
     <div class="card shadow-sm mb-3">
       <div class="card-body p-3">
-        <div id="price-chart" class="chart-container bg-white rounded-3" data-crypto-id="{{ crypto.id }}" data-series='{{ series|tojson }}' data-prophet='{{ prophet_forecast|tojson }}' data-prophet-cutoff="{{ prophet_cutoff or '' }}" data-prophet-line="{{ prophet_line_date or '' }}" data-lstm='{{ lstm_forecast|tojson }}' data-lstm-cutoff="{{ lstm_cutoff or '' }}" data-lstm-line="{{ lstm_line_date or '' }}" data-gru='{{ gru_forecast|tojson }}' data-gru-cutoff="{{ gru_cutoff or '' }}" data-gru-line="{{ gru_line_date or '' }}" data-currency="{{ currency }}"></div>
+        <div id="price-chart" class="chart-container bg-white rounded-3" data-crypto-id="{{ crypto.id }}" data-series='{{ series|tojson }}' data-series-padding='{{ series_padding|tojson }}' data-prophet='{{ prophet_forecast|tojson }}' data-prophet-cutoff="{{ prophet_cutoff or '' }}" data-prophet-line="{{ prophet_line_date or '' }}" data-lstm='{{ lstm_forecast|tojson }}' data-lstm-cutoff="{{ lstm_cutoff or '' }}" data-lstm-line="{{ lstm_line_date or '' }}" data-gru='{{ gru_forecast|tojson }}' data-gru-cutoff="{{ gru_cutoff or '' }}" data-gru-line="{{ gru_line_date or '' }}" data-currency="{{ currency }}"></div>
         <div class="pt-3 mt-3 border-top">
           <div class="ct-toolbar">
             <div class="form-check ct-chip">
@@ -521,8 +521,12 @@
               <label class="form-check-label" for="toggle-price-mode">Price</label>
             </div>
             <div class="form-check ct-chip">
-              <input class="form-check-input" type="checkbox" value="SMA 7" id="toggle-sma-7">
-              <label class="form-check-label" for="toggle-sma-7">SMA 7</label>
+              <input class="form-check-input" type="checkbox" value="EMA 50" id="toggle-ema-50">
+              <label class="form-check-label" for="toggle-ema-50">EMA 50</label>
+            </div>
+            <div class="form-check ct-chip">
+              <input class="form-check-input" type="checkbox" value="EMA 20" id="toggle-ema-20">
+              <label class="form-check-label" for="toggle-ema-20">EMA 20</label>
             </div>
             <div class="form-check ct-chip">
               <input class="form-check-input" type="checkbox" value="SMA 50" id="toggle-sma-50">

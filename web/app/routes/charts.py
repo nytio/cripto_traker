@@ -242,10 +242,18 @@ def crypto_detail(crypto_id: int):
     if days > 0:
         fetch_days = min(days + indicator_padding, max_days)
     rows = fetch_price_series(session, crypto_id, fetch_days)
-    series = compute_indicators(rows)
+    series_full = compute_indicators(rows)
+    series_padding = []
+    series = series_full
     if start_date is not None:
         start_iso = start_date.isoformat()
-        series = [row for row in series if row["date"] >= start_iso]
+        series_padding = [row for row in series_full if row["date"] < start_iso]
+        if series_padding:
+            series_padding = [
+                {"date": row["date"], "price": row["price"]}
+                for row in series_padding[-indicator_padding:]
+            ]
+        series = [row for row in series_full if row["date"] >= start_iso]
 
     prophet_forecast = fetch_prophet_forecast(session, crypto_id, start_date)
     prophet_cutoff_date, _prophet_horizon_days = fetch_prophet_meta(
@@ -293,6 +301,7 @@ def crypto_detail(crypto_id: int):
         "crypto_detail.html",
         crypto=crypto,
         series=series,
+        series_padding=series_padding,
         prophet_forecast=prophet_forecast,
         prophet_cutoff=prophet_cutoff_date.isoformat()
         if prophet_cutoff_date

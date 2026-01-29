@@ -67,9 +67,50 @@ if (chartEl) {
   if (series.length) {
     const dates = series.map((row) => row.date);
     const prices = series.map((row) => row.price);
-    const sma7 = series.map((row) => row.sma_7);
     const sma50 = series.map((row) => row.sma_50);
     const sma20 = series.map((row) => row.sma_20);
+    const seriesPadding = JSON.parse(chartEl.dataset.seriesPadding || "[]");
+    const paddingPrices = seriesPadding.map((row) => row.price);
+    const buildEmaWithPadding = (period) => {
+      const paddingNeeded = Math.max(period - 1, 0);
+      const paddingTail =
+        paddingNeeded > 0 ? paddingPrices.slice(-paddingNeeded) : [];
+      const extraCount = paddingTail.length;
+      const paddedValues =
+        extraCount > 0 ? [...paddingTail, ...prices] : prices;
+      const alpha = 2 / (period + 1);
+      const result = new Array(paddedValues.length).fill(null);
+      let ema = null;
+      for (let i = 0; i < paddedValues.length; i += 1) {
+        const value = paddedValues[i];
+        if (!Number.isFinite(value)) {
+          ema = null;
+          result[i] = null;
+          continue;
+        }
+        const isPadding = i < extraCount;
+        if (ema === null) {
+          const windowStart = i - (period - 1);
+          if (windowStart < 0) {
+            result[i] = null;
+            continue;
+          }
+          const window = paddedValues.slice(windowStart, i + 1);
+          if (!window.every((item) => Number.isFinite(item))) {
+            result[i] = null;
+            continue;
+          }
+          ema = window.reduce((acc, current) => acc + current, 0) / period;
+          result[i] = isPadding ? null : ema;
+          continue;
+        }
+        ema = alpha * value + (1 - alpha) * ema;
+        result[i] = isPadding ? null : ema;
+      }
+      return result.slice(extraCount);
+    };
+    const ema20 = buildEmaWithPadding(20);
+    const ema50 = buildEmaWithPadding(50);
     const bbUpper = series.map((row) => row.bb_upper);
     const bbLower = series.map((row) => row.bb_lower);
     const prophetForecastRaw = JSON.parse(chartEl.dataset.prophet || "[]");
@@ -95,8 +136,8 @@ if (chartEl) {
       markerLine: "rgba(160, 160, 160, 0.8)",
       bollingerBand: "rgba(148, 103, 189, 0.15)",
       bollingerLine: "rgba(148, 103, 189, 0.3)",
-      sma50: "#2CA02C",
-      sma20: "rgba(148, 103, 189, 0.7)",
+      sma50: "#1f77b4",
+      sma20: "#ff7f0e",
     };
     const lineWidths = {
       price: 2.5,
@@ -390,13 +431,23 @@ if (chartEl) {
       priceMonoTrace,
       {
         x: dates,
-        y: sma7,
+        y: ema50,
         type: "scatter",
         mode: "lines",
-        name: "SMA 7",
+        name: "EMA 50",
         showlegend: false,
         visible: "legendonly",
-        line: { color: "#FF7F0E", dash: "dash", width: smaLineWidth },
+        line: { color: "#1f77b4", width: smaLineWidth },
+      },
+      {
+        x: dates,
+        y: ema20,
+        type: "scatter",
+        mode: "lines",
+        name: "EMA 20",
+        showlegend: false,
+        visible: "legendonly",
+        line: { color: "#ff7f0e", width: smaLineWidth },
       },
       {
         x: dates,
@@ -464,7 +515,8 @@ if (chartEl) {
 
     Plotly.newPlot("price-chart", data, layout, { responsive: true });
 
-    const sma7Toggle = document.getElementById("toggle-sma-7");
+    const ema50Toggle = document.getElementById("toggle-ema-50");
+    const ema20Toggle = document.getElementById("toggle-ema-20");
     const sma50Toggle = document.getElementById("toggle-sma-50");
     const sma20Toggle = document.getElementById("toggle-sma-20");
     const bollingerToggle = document.getElementById("toggle-bollinger");
@@ -487,7 +539,7 @@ if (chartEl) {
     const priceMonoIndex = priceTraceOffset + priceTraces.length;
     const indicatorOffset = priceMonoIndex + 1;
     const bollingerBandIndices = bollingerBandTraces.map((_, index) => index);
-    const bollingerLineIndices = [indicatorOffset + 3, indicatorOffset + 4];
+    const bollingerLineIndices = [indicatorOffset + 4, indicatorOffset + 5];
     const bollingerTraceIndices = [...bollingerBandIndices, ...bollingerLineIndices];
 
     const setVisibility = (traceIndices, visible) => {
@@ -513,21 +565,27 @@ if (chartEl) {
       Plotly.relayout("price-chart", { shapes });
     };
 
-    if (sma7Toggle) {
-      sma7Toggle.addEventListener("change", (event) => {
+    if (ema50Toggle) {
+      ema50Toggle.addEventListener("change", (event) => {
         setVisibility([indicatorOffset], event.target.checked);
-        persistToggleState("sma7", event.target.checked);
+        persistToggleState("ema50", event.target.checked);
+      });
+    }
+    if (ema20Toggle) {
+      ema20Toggle.addEventListener("change", (event) => {
+        setVisibility([indicatorOffset + 1], event.target.checked);
+        persistToggleState("ema20", event.target.checked);
       });
     }
     if (sma50Toggle) {
       sma50Toggle.addEventListener("change", (event) => {
-        setVisibility([indicatorOffset + 1], event.target.checked);
+        setVisibility([indicatorOffset + 2], event.target.checked);
         persistToggleState("sma50", event.target.checked);
       });
     }
     if (sma20Toggle) {
       sma20Toggle.addEventListener("change", (event) => {
-        setVisibility([indicatorOffset + 2], event.target.checked);
+        setVisibility([indicatorOffset + 3], event.target.checked);
         persistToggleState("sma20", event.target.checked);
       });
     }
@@ -617,7 +675,8 @@ if (chartEl) {
       toggle.dispatchEvent(new Event("change", { bubbles: true }));
     };
 
-    applyToggleState(sma7Toggle, "sma7");
+    applyToggleState(ema50Toggle, "ema50");
+    applyToggleState(ema20Toggle, "ema20");
     applyToggleState(sma50Toggle, "sma50");
     applyToggleState(sma20Toggle, "sma20");
     applyToggleState(bollingerToggle, "bollinger");
