@@ -1,3 +1,5 @@
+import math
+
 from flask import (
     Blueprint,
     current_app,
@@ -13,7 +15,7 @@ from sqlalchemy import select
 
 from ..db import get_session
 from ..models import Cryptocurrency, Price, ProphetForecast, UserCrypto
-from ..services.analytics import compute_indicators
+from ..services.analytics import compute_ema_series, compute_indicators
 from ..services.jobs import get_job_status, start_job
 from ..services.prophet import store_prophet_forecast
 from ..services.prophet_defaults import resolve_prophet_defaults
@@ -23,6 +25,9 @@ bp = Blueprint("dashboard", __name__)
 
 PROPHET_BULK_JOB_TYPE = "prophet_bulk"
 PROPHET_BULK_LABEL = "Prophet (all)"
+EMA_LOOKBACK = 120
+EMA_PERIOD = 50
+EMA_SLOPE_LAG = 20
 
 
 def _prophet_bulk_job_key(user_id: int) -> str:
@@ -108,6 +113,50 @@ def _latest_prophet_percent(
     return (float(prophet_yhat) - price_value) / price_value
 
 
+def _trend_class(value: float | None, positive: float, negative: float) -> str:
+    if value is None:
+        return "text-muted"
+    if value > positive:
+        return "text-success"
+    if value < negative:
+        return "text-danger"
+    return "text-muted"
+
+
+def _latest_ema50_indicators(
+    recent_prices: list[Price], latest_price: Price | None
+) -> dict[str, float | None]:
+    result = {"ema_50": None, "trend_50": None, "slope_50": None}
+    if latest_price is None or not recent_prices:
+        return result
+    prices = [float(price.price) for price in reversed(recent_prices)]
+    if not prices:
+        return result
+    if len(prices) > EMA_LOOKBACK:
+        prices = prices[-EMA_LOOKBACK:]
+    ema_series = compute_ema_series(prices, EMA_PERIOD)
+    if not ema_series:
+        return result
+    ema_latest = ema_series[-1]
+    if ema_latest is None or ema_latest == 0:
+        return result
+    latest_value = float(latest_price.price)
+    if latest_value == 0:
+        return result
+    result["ema_50"] = ema_latest
+    result["trend_50"] = (latest_value / ema_latest) - 1
+    if len(ema_series) > EMA_SLOPE_LAG:
+        ema_prev = ema_series[-(EMA_SLOPE_LAG + 1)]
+        if ema_prev is not None and ema_prev > 0 and ema_latest > 0:
+            log_growth = (
+                365
+                * (math.log(ema_latest) - math.log(ema_prev))
+                / EMA_SLOPE_LAG
+            )
+            result["slope_50"] = math.exp(log_growth) - 1
+    return result
+
+
 @bp.get("/")
 def index():
     session = get_session()
@@ -128,13 +177,14 @@ def index():
                 select(Price)
                 .where(Price.crypto_id == crypto.id)
                 .order_by(Price.date.desc())
-                .limit(50)
+                .limit(EMA_LOOKBACK)
             )
             .scalars()
             .all()
         )
         latest_price = recent_prices[0] if recent_prices else None
         bollinger = _latest_bollinger_indicators(recent_prices, latest_price)
+        ema_indicators = _latest_ema50_indicators(recent_prices, latest_price)
         rows.append(
             {
                 "crypto": crypto,
@@ -142,6 +192,15 @@ def index():
                 "bollinger_percent": bollinger["percent"],
                 "bollinger_bandwidth": bollinger["bandwidth"],
                 "sma_spread": bollinger["sma_spread"],
+                "ema_50": ema_indicators["ema_50"],
+                "trend_50": ema_indicators["trend_50"],
+                "trend_50_class": _trend_class(
+                    ema_indicators["trend_50"], 0.02, -0.02
+                ),
+                "slope_50": ema_indicators["slope_50"],
+                "slope_50_class": _trend_class(
+                    ema_indicators["slope_50"], 0.10, -0.10
+                ),
                 "prophet_percent": _latest_prophet_percent(
                     session, crypto.id, latest_price
                 ),

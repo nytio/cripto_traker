@@ -1,4 +1,5 @@
 import importlib.resources as importlib_resources
+import math
 import logging
 import os
 from functools import lru_cache
@@ -18,6 +19,39 @@ except ImportError:  # pragma: no cover - optional dependency fallback
     cmdstan_path = None
 
 logger = logging.getLogger(__name__)
+
+
+def compute_ema_series(
+    values: list[float], period: int
+) -> list[float | None]:
+    if period <= 0:
+        raise ValueError(f"period must be positive, got {period}")
+    if not values:
+        return []
+
+    result: list[float | None] = [None] * len(values)
+    alpha = 2 / (period + 1)
+    ema: float | None = None
+    for index, value in enumerate(values):
+        if not math.isfinite(value):
+            ema = None
+            result[index] = None
+            continue
+        if ema is None:
+            window_start = index - (period - 1)
+            if window_start < 0:
+                result[index] = None
+                continue
+            window = values[window_start : index + 1]
+            if not all(math.isfinite(item) for item in window):
+                result[index] = None
+                continue
+            ema = sum(window) / period
+            result[index] = ema
+            continue
+        ema = (alpha * value) + ((1 - alpha) * ema)
+        result[index] = ema
+    return result
 
 
 def compute_indicators(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

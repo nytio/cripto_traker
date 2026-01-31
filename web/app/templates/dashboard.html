@@ -65,6 +65,10 @@
                   <div class="ct-meta">Date</div>
                 </th>
                 <th class="text-end">
+                  <div>Trend50</div>
+                  <div class="ct-meta">Pendiente</div>
+                </th>
+                <th class="text-end">
                   <div>Bollinger</div>
                   <div class="ct-meta" title="Bollinger BandWidth">BBW</div>
                 </th>
@@ -98,6 +102,18 @@
                       </div>
                     {% else %}
                       <span class="text-muted">--</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if row.trend_50 is not none %}
+                      <div class="fw-semibold {{ row.trend_50_class }}">{{ "{:+.1f}".format(row.trend_50 * 100) }}</div>
+                    {% else %}
+                      <div class="text-muted">--</div>
+                    {% endif %}
+                    {% if row.slope_50 is not none %}
+                      <div class="small {{ row.slope_50_class }}">{{ "{:+.2f}".format(row.slope_50) }}</div>
+                    {% else %}
+                      <div class="small text-muted">--</div>
                     {% endif %}
                   </td>
                   <td class="text-end">
