@@ -139,6 +139,12 @@ if (chartEl) {
       sma50: "#1f77b4",
       sma20: "#ff7f0e",
     };
+    const rulerColors = {
+      line: "#F39C12",
+      fill: "rgba(243, 156, 18, 0.12)",
+      annotationBg: "rgba(255, 255, 255, 0.92)",
+      annotationBorder: "rgba(243, 156, 18, 0.55)",
+    };
     const lineWidths = {
       price: 2.5,
       sma: 1.2,
@@ -513,7 +519,63 @@ if (chartEl) {
       showlegend: false,
     };
 
-    Plotly.newPlot("price-chart", data, layout, { responsive: true });
+    const pickPlotlyIcon = (candidates) => {
+      if (!Plotly || !Plotly.Icons) {
+        return null;
+      }
+      for (const key of candidates) {
+        if (Plotly.Icons[key]) {
+          return Plotly.Icons[key];
+        }
+      }
+      return null;
+    };
+    const plotConfig = { responsive: true };
+    const rulerModebarIcon = pickPlotlyIcon([
+      "drawrect",
+      "square",
+      "rect",
+      "shape",
+      "selectbox",
+      "pencil",
+    ]);
+    const clearModebarIcon = pickPlotlyIcon([
+      "eraseshape",
+      "eraser",
+      "trash",
+      "close",
+    ]);
+    if (rulerModebarIcon) {
+      plotConfig.modeBarButtonsToAdd = [
+        {
+          name: "Regla",
+          title: "Regla (rectángulo)",
+          icon: rulerModebarIcon,
+          click: () => {
+            const nextActive = !rulerState.active;
+            if (rulerToggle) {
+              rulerToggle.checked = nextActive;
+            }
+            setRulerActive(nextActive);
+            persistToggleState("ruler", nextActive);
+          },
+        },
+      ];
+      if (clearModebarIcon) {
+        plotConfig.modeBarButtonsToAdd.push({
+          name: "Limpiar regla",
+          title: "Limpiar regla",
+          icon: clearModebarIcon,
+          click: () => {
+            clearRuler();
+          },
+        });
+      }
+    } else {
+      plotConfig.modeBarButtonsToAdd = ["drawrect", "eraseshape"];
+    }
+
+    Plotly.newPlot("price-chart", data, layout, plotConfig);
 
     const ema50Toggle = document.getElementById("toggle-ema-50");
     const ema20Toggle = document.getElementById("toggle-ema-20");
@@ -524,6 +586,8 @@ if (chartEl) {
     const lstmToggle = document.getElementById("toggle-lstm");
     const gruToggle = document.getElementById("toggle-gru");
     const priceModeToggle = document.getElementById("toggle-price-mode");
+    const rulerToggle = document.getElementById("toggle-ruler");
+    const rulerClear = document.getElementById("clear-ruler");
     const prophetTraceOffset = bollingerBandTraces.length;
     const prophetTraceIndices = prophetTraces.map(
       (_, index) => prophetTraceOffset + index
@@ -549,8 +613,21 @@ if (chartEl) {
         traceIndices
       );
     };
+    let suppressRelayout = false;
+    const relayoutSafe = (updates) => {
+      suppressRelayout = true;
+      const relayoutPromise = Plotly.relayout("price-chart", updates);
+      if (relayoutPromise && typeof relayoutPromise.finally === "function") {
+        relayoutPromise.finally(() => {
+          suppressRelayout = false;
+        });
+      } else {
+        suppressRelayout = false;
+      }
+      return relayoutPromise;
+    };
     const refreshAxes = () => {
-      Plotly.relayout("price-chart", {
+      relayoutSafe({
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       });
@@ -560,9 +637,135 @@ if (chartEl) {
       lstm: null,
       gru: null,
     };
+    const rulerState = {
+      active: false,
+      rect: null,
+      line: null,
+      annotation: null,
+      lastDragMode: null,
+      isUpdating: false,
+    };
+    const formatElapsed = (ms) => {
+      const absMs = Math.abs(ms);
+      const minutes = absMs / 60000;
+      if (minutes < 60) {
+        return `${Math.round(minutes)} min`;
+      }
+      const hours = absMs / 3600000;
+      if (hours < 24) {
+        return `${hours.toFixed(1)} h`;
+      }
+      const days = absMs / 86400000;
+      const decimals = days < 10 ? 2 : 1;
+      return `${days.toFixed(decimals)} días`;
+    };
+    const parseDateValue = (value) => {
+      if (value instanceof Date) {
+        return value;
+      }
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        return null;
+      }
+      return parsed;
+    };
+    const formatPercent = (value) => {
+      if (!Number.isFinite(value)) {
+        return "--";
+      }
+      const sign = value >= 0 ? "+" : "";
+      return `${sign}${value.toFixed(2)}%`;
+    };
+    const buildRulerOverlay = (rect) => {
+      if (!rect) {
+        return null;
+      }
+      const x0 = rect.x0;
+      const x1 = rect.x1;
+      const y0 = Number(rect.y0);
+      const y1 = Number(rect.y1);
+      if (!Number.isFinite(y0) || !Number.isFinite(y1)) {
+        return null;
+      }
+      const startDate = parseDateValue(x0);
+      const endDate = parseDateValue(x1);
+      const deltaTimeMs =
+        startDate && endDate ? endDate.getTime() - startDate.getTime() : 0;
+      const deltaPct = y0 !== 0 ? ((y1 - y0) / y0) * 100 : null;
+      const midX =
+        startDate && endDate
+          ? new Date(
+              (startDate.getTime() + endDate.getTime()) / 2
+            ).toISOString()
+          : x0;
+      const midY = (y0 + y1) / 2;
+      return {
+        rect: {
+          type: "rect",
+          xref: "x",
+          yref: "y",
+          x0,
+          x1,
+          y0,
+          y1,
+          line: { color: rulerColors.line, width: 1.2, dash: "dot" },
+          fillcolor: rulerColors.fill,
+          opacity: 0.25,
+          layer: "above",
+        },
+        line: {
+          type: "line",
+          xref: "x",
+          yref: "y",
+          x0,
+          x1,
+          y0,
+          y1,
+          line: { color: rulerColors.line, width: 2 },
+          layer: "above",
+        },
+        annotation: {
+          x: midX,
+          y: midY,
+          xref: "x",
+          yref: "y",
+          text: `${formatPercent(deltaPct)}<br>${formatElapsed(deltaTimeMs)}`,
+          showarrow: false,
+          bgcolor: rulerColors.annotationBg,
+          bordercolor: rulerColors.annotationBorder,
+          borderwidth: 1,
+          font: { size: 11, color: "#2f2f2f" },
+          align: "center",
+        },
+      };
+    };
+    const updateOverlays = () => {
+      const markerShapes = Object.values(activeMarkers).filter(Boolean);
+      const rulerShapes = [];
+      if (rulerState.rect) {
+        rulerShapes.push(rulerState.rect);
+      }
+      if (rulerState.line) {
+        rulerShapes.push(rulerState.line);
+      }
+      const annotations = rulerState.annotation ? [rulerState.annotation] : [];
+      rulerState.isUpdating = true;
+      const overlayPromise = relayoutSafe({
+        shapes: [...markerShapes, ...rulerShapes],
+        annotations,
+      });
+      if (overlayPromise && typeof overlayPromise.finally === "function") {
+        overlayPromise.finally(() => {
+          rulerState.isUpdating = false;
+        });
+      } else {
+        setTimeout(() => {
+          rulerState.isUpdating = false;
+        }, 0);
+      }
+    };
     const updateMarkers = () => {
-      const shapes = Object.values(activeMarkers).filter(Boolean);
-      Plotly.relayout("price-chart", { shapes });
+      updateOverlays();
     };
 
     if (ema50Toggle) {
@@ -649,6 +852,120 @@ if (chartEl) {
         persistToggleState("gru", event.target.checked);
       });
     }
+    const clearRuler = (deactivate = true) => {
+      rulerState.rect = null;
+      rulerState.line = null;
+      rulerState.annotation = null;
+      updateOverlays();
+      if (deactivate) {
+        if (rulerToggle) {
+          rulerToggle.checked = false;
+        }
+        setRulerActive(false);
+        persistToggleState("ruler", false);
+      }
+    };
+    const setRulerActive = (active) => {
+      rulerState.active = active;
+      if (active) {
+        rulerState.lastDragMode =
+          (chartEl._fullLayout && chartEl._fullLayout.dragmode) || "zoom";
+        relayoutSafe({
+          dragmode: "drawrect",
+          newshape: {
+            line: { color: rulerColors.line, width: 1.2 },
+            fillcolor: rulerColors.fill,
+            opacity: 0.25,
+          },
+        });
+      } else {
+        relayoutSafe({
+          dragmode: rulerState.lastDragMode || "zoom",
+          newshape: {},
+        });
+      }
+    };
+    const extractRectFromRelayout = (eventData) => {
+      if (!eventData) {
+        return null;
+      }
+      if (Array.isArray(eventData.shapes) && eventData.shapes.length) {
+        for (let i = eventData.shapes.length - 1; i >= 0; i -= 1) {
+          const shape = eventData.shapes[i];
+          if (shape && shape.type === "rect") {
+            return shape;
+          }
+        }
+      }
+      const keys = Object.keys(eventData).filter((key) =>
+        key.startsWith("shapes[")
+      );
+      if (!keys.length) {
+        return null;
+      }
+      const match = keys[0].match(/^shapes\[(\d+)\]/);
+      if (!match) {
+        return null;
+      }
+      const index = Number(match[1]);
+      const shapes =
+        (chartEl.layout && chartEl.layout.shapes) ||
+        (chartEl._fullLayout && chartEl._fullLayout.shapes) ||
+        [];
+      const shape = shapes[index];
+      return shape && shape.type === "rect" ? shape : null;
+    };
+    chartEl.on("plotly_relayout", (eventData) => {
+      if (suppressRelayout || rulerState.isUpdating) {
+        return;
+      }
+      if (!eventData) {
+        return;
+      }
+      const relayoutKeys = Object.keys(eventData);
+      const shapesProvided = Array.isArray(eventData.shapes);
+      if (shapesProvided && eventData.shapes.length === 0) {
+        clearRuler();
+        return;
+      }
+      const hasShapeArray = shapesProvided && eventData.shapes.length > 0;
+      const hasShapeCorners = relayoutKeys.some((key) =>
+        /^shapes\[\d+\]\.(x0|x1|y0|y1)$/.test(key)
+      );
+      if (!hasShapeArray && !hasShapeCorners) {
+        return;
+      }
+      const rect = extractRectFromRelayout(eventData);
+      if (!rect) {
+        clearRuler();
+        return;
+      }
+      if (!rulerState.active) {
+        rulerState.active = true;
+        if (rulerToggle) {
+          rulerToggle.checked = true;
+        }
+      }
+      const overlay = buildRulerOverlay(rect);
+      if (!overlay) {
+        return;
+      }
+      rulerState.rect = overlay.rect;
+      rulerState.line = overlay.line;
+      rulerState.annotation = overlay.annotation;
+      updateOverlays();
+    });
+    if (rulerToggle) {
+      rulerToggle.addEventListener("change", (event) => {
+        setRulerActive(event.target.checked);
+        persistToggleState("ruler", event.target.checked);
+      });
+    }
+    if (rulerClear) {
+      rulerClear.addEventListener("click", () => {
+        clearRuler();
+      });
+    }
     if (priceModeToggle) {
       priceModeToggle.addEventListener("change", (event) => {
         const useMono = event.target.checked;
@@ -684,5 +1001,6 @@ if (chartEl) {
     applyToggleState(lstmToggle, "lstm");
     applyToggleState(gruToggle, "gru");
     applyToggleState(priceModeToggle, "priceMode");
+    applyToggleState(rulerToggle, "ruler");
   }
 }
