@@ -145,6 +145,7 @@ if (chartEl) {
       annotationBg: "rgba(255, 255, 255, 0.92)",
       annotationBorder: "rgba(243, 156, 18, 0.55)",
     };
+    const rulerRectOpacity = 0.75;
     const lineWidths = {
       price: 2.5,
       sma: 1.2,
@@ -531,6 +532,7 @@ if (chartEl) {
       return null;
     };
     const plotConfig = { responsive: true };
+    const rulerModebarTitle = "Ruler (rectangle)";
     const rulerModebarIcon = pickPlotlyIcon([
       "drawrect",
       "square",
@@ -539,38 +541,26 @@ if (chartEl) {
       "selectbox",
       "pencil",
     ]);
-    const clearModebarIcon = pickPlotlyIcon([
-      "eraseshape",
-      "eraser",
-      "trash",
-      "close",
-    ]);
     if (rulerModebarIcon) {
       plotConfig.modeBarButtonsToAdd = [
         {
-          name: "Regla",
-          title: "Regla (rectángulo)",
+          name: "Ruler",
+          title: rulerModebarTitle,
           icon: rulerModebarIcon,
           click: () => {
             const nextActive = !rulerState.active;
             if (rulerToggle) {
               rulerToggle.checked = nextActive;
             }
-            setRulerActive(nextActive);
-            persistToggleState("ruler", nextActive);
+            if (nextActive) {
+              setRulerActive(true);
+              persistToggleState("ruler", true);
+            } else {
+              clearRuler();
+            }
           },
         },
       ];
-      if (clearModebarIcon) {
-        plotConfig.modeBarButtonsToAdd.push({
-          name: "Limpiar regla",
-          title: "Limpiar regla",
-          icon: clearModebarIcon,
-          click: () => {
-            clearRuler();
-          },
-        });
-      }
     } else {
       plotConfig.modeBarButtonsToAdd = ["drawrect", "eraseshape"];
     }
@@ -639,11 +629,25 @@ if (chartEl) {
     };
     const rulerState = {
       active: false,
-      rect: null,
-      line: null,
-      annotation: null,
+      items: [],
+      draft: null,
+      lastFinalSignature: null,
       lastDragMode: null,
       isUpdating: false,
+    };
+    const findRulerModebarButton = () => {
+      const modebar = chartEl.querySelector(".modebar");
+      if (!modebar) {
+        return null;
+      }
+      return modebar.querySelector(`[data-title="${rulerModebarTitle}"]`);
+    };
+    const updateRulerModebarState = () => {
+      const button = findRulerModebarButton();
+      if (!button) {
+        return;
+      }
+      button.classList.toggle("active", rulerState.active);
     };
     const formatElapsed = (ms) => {
       const absMs = Math.abs(ms);
@@ -710,7 +714,7 @@ if (chartEl) {
           y1,
           line: { color: rulerColors.line, width: 1.2, dash: "dot" },
           fillcolor: rulerColors.fill,
-          opacity: 0.25,
+          opacity: rulerRectOpacity,
           layer: "above",
         },
         line: {
@@ -739,20 +743,73 @@ if (chartEl) {
         },
       };
     };
+    const buildRectSignature = (rect) => {
+      if (!rect) {
+        return null;
+      }
+      const y0 = Number(rect.y0);
+      const y1 = Number(rect.y1);
+      if (!Number.isFinite(y0) || !Number.isFinite(y1)) {
+        return null;
+      }
+      const x0 = rect.x0;
+      const x1 = rect.x1;
+      return `${x0}|${x1}|${y0.toFixed(4)}|${y1.toFixed(4)}`;
+    };
+    const getLayoutShapes = () =>
+      (chartEl.layout && chartEl.layout.shapes) ||
+      (chartEl._fullLayout && chartEl._fullLayout.shapes) ||
+      [];
+    const syncRulerItemsFromShapes = (shapes) => {
+      if (!Array.isArray(shapes)) {
+        return 0;
+      }
+      const overlays = [];
+      let lastSignature = null;
+      shapes.forEach((shape) => {
+        if (!shape || shape.type !== "rect") {
+          return;
+        }
+        const overlay = buildRulerOverlay(shape);
+        if (!overlay) {
+          return;
+        }
+        overlays.push(overlay);
+        lastSignature = buildRectSignature(shape) || lastSignature;
+      });
+      rulerState.items = overlays;
+      rulerState.draft = null;
+      rulerState.lastFinalSignature = lastSignature;
+      return overlays.length;
+    };
     const updateOverlays = () => {
       const markerShapes = Object.values(activeMarkers).filter(Boolean);
       const rulerShapes = [];
-      if (rulerState.rect) {
-        rulerShapes.push(rulerState.rect);
+      const rulerAnnotations = [];
+      const pushOverlay = (overlay) => {
+        if (!overlay) {
+          return;
+        }
+        if (overlay.rect) {
+          rulerShapes.push(overlay.rect);
+        }
+        if (overlay.line) {
+          rulerShapes.push(overlay.line);
+        }
+        if (overlay.annotation) {
+          rulerAnnotations.push(overlay.annotation);
+        }
+      };
+      rulerState.items.forEach((item) => {
+        pushOverlay(item);
+      });
+      if (rulerState.draft) {
+        pushOverlay(rulerState.draft);
       }
-      if (rulerState.line) {
-        rulerShapes.push(rulerState.line);
-      }
-      const annotations = rulerState.annotation ? [rulerState.annotation] : [];
       rulerState.isUpdating = true;
       const overlayPromise = relayoutSafe({
         shapes: [...markerShapes, ...rulerShapes],
-        annotations,
+        annotations: rulerAnnotations,
       });
       if (overlayPromise && typeof overlayPromise.finally === "function") {
         overlayPromise.finally(() => {
@@ -853,9 +910,9 @@ if (chartEl) {
       });
     }
     const clearRuler = (deactivate = true) => {
-      rulerState.rect = null;
-      rulerState.line = null;
-      rulerState.annotation = null;
+      rulerState.items = [];
+      rulerState.draft = null;
+      rulerState.lastFinalSignature = null;
       updateOverlays();
       if (deactivate) {
         if (rulerToggle) {
@@ -867,22 +924,32 @@ if (chartEl) {
     };
     const setRulerActive = (active) => {
       rulerState.active = active;
+      updateRulerModebarState();
+      const resyncModebar = () => {
+        updateRulerModebarState();
+      };
+      let relayoutPromise;
       if (active) {
         rulerState.lastDragMode =
           (chartEl._fullLayout && chartEl._fullLayout.dragmode) || "zoom";
-        relayoutSafe({
+        relayoutPromise = relayoutSafe({
           dragmode: "drawrect",
           newshape: {
             line: { color: rulerColors.line, width: 1.2 },
             fillcolor: rulerColors.fill,
-            opacity: 0.25,
+            opacity: rulerRectOpacity,
           },
         });
       } else {
-        relayoutSafe({
+        relayoutPromise = relayoutSafe({
           dragmode: rulerState.lastDragMode || "zoom",
           newshape: {},
         });
+      }
+      if (relayoutPromise && typeof relayoutPromise.finally === "function") {
+        relayoutPromise.finally(resyncModebar);
+      } else {
+        setTimeout(resyncModebar, 0);
       }
     };
     const extractRectFromRelayout = (eventData) => {
@@ -908,10 +975,7 @@ if (chartEl) {
         return null;
       }
       const index = Number(match[1]);
-      const shapes =
-        (chartEl.layout && chartEl.layout.shapes) ||
-        (chartEl._fullLayout && chartEl._fullLayout.shapes) ||
-        [];
+      const shapes = getLayoutShapes();
       const shape = shapes[index];
       return shape && shape.type === "rect" ? shape : null;
     };
@@ -935,8 +999,13 @@ if (chartEl) {
       if (!hasShapeArray && !hasShapeCorners) {
         return;
       }
-      const rect = extractRectFromRelayout(eventData);
-      if (!rect) {
+      const layoutShapes = getLayoutShapes();
+      const shapesSource = shapesProvided ? eventData.shapes : layoutShapes;
+      let rulerCount = syncRulerItemsFromShapes(shapesSource);
+      if (!rulerCount && shapesProvided) {
+        rulerCount = syncRulerItemsFromShapes(layoutShapes);
+      }
+      if (!rulerCount) {
         clearRuler();
         return;
       }
@@ -945,20 +1014,18 @@ if (chartEl) {
         if (rulerToggle) {
           rulerToggle.checked = true;
         }
+        updateRulerModebarState();
       }
-      const overlay = buildRulerOverlay(rect);
-      if (!overlay) {
-        return;
-      }
-      rulerState.rect = overlay.rect;
-      rulerState.line = overlay.line;
-      rulerState.annotation = overlay.annotation;
       updateOverlays();
     });
     if (rulerToggle) {
       rulerToggle.addEventListener("change", (event) => {
-        setRulerActive(event.target.checked);
-        persistToggleState("ruler", event.target.checked);
+        if (event.target.checked) {
+          setRulerActive(true);
+          persistToggleState("ruler", true);
+        } else {
+          clearRuler();
+        }
       });
     }
     if (rulerClear) {
@@ -966,6 +1033,9 @@ if (chartEl) {
         clearRuler();
       });
     }
+    chartEl.on("plotly_afterplot", () => {
+      updateRulerModebarState();
+    });
     if (priceModeToggle) {
       priceModeToggle.addEventListener("change", (event) => {
         const useMono = event.target.checked;
