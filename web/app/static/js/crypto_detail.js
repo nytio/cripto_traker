@@ -531,7 +531,10 @@ if (chartEl) {
       }
       return null;
     };
-    const plotConfig = { responsive: true };
+    const plotConfig = {
+      responsive: true,
+      modeBarButtonsToRemove: ["resetScale2d"],
+    };
     const rulerModebarTitle = "Ruler (rectangle)";
     const rulerModebarIcon = pickPlotlyIcon([
       "drawrect",
